@@ -1,6 +1,6 @@
 # Mini React 아키텍처: 데이터 흐름
 
-> 이 구현에는 JSX 변환기가 없다. JSX 자리에는 `h(tag, props, ...children)` 호출을 직접 쓴다.
+>`h(tag, props, ...children)` 호출을 직접 쓴다.
 > `h()`가 React의 `createElement`에 해당한다.
 
 ## 1. 전체 흐름 (Phase 2: 컴포넌트가 화면을 갱신하기까지)
