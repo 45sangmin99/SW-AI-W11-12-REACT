@@ -1,9 +1,45 @@
 // Phase 2: Component · State · Hooks
 // 상태가 바뀌면 Phase 1의 Virtual DOM -> Diff -> Patch 흐름을 그대로 사용한다 (P2-30 ~ P2-32).
 import { ELEMENT, TEXT, deepFreeze } from "./vdom.js";
-import { render } from "./dom.js";
+import { render, setEventRunner } from "./dom.js";
 import { diff } from "./diff.js";
 import { patch } from "./patch.js";
+
+// ---------------------------------------------------------------- Batching (O-01)
+// batch() 안에서 일어난 setState는 값만 바로 바꾸고, 렌더링은 가장 바깥 batch가 끝날 때 컴포넌트당 한 번만 한다.
+//  - 이벤트 핸들러는 자동으로 batch 안에서 실행된다 (아래 setEventRunner).
+//  - 타이머·fetch 콜백처럼 이벤트 밖에서는 직접 batch(() => { ... })로 감싼다.
+//  - batch 밖의 setState는 예전처럼 즉시 렌더링한다.
+let batchDepth = 0;
+const dirty = new Set(); // 값이 바뀌었지만 아직 다시 그리지 않은 컴포넌트
+
+export function batch(fn) {
+  batchDepth++;
+  try {
+    return fn();
+  } finally {
+    batchDepth--;
+    if (batchDepth === 0) flushDirty();
+  }
+}
+
+function flushDirty() {
+  const list = [...dirty];
+  dirty.clear(); // update() 도중 다시 setState가 와도 이번 목록과 섞이지 않게 먼저 비운다
+  let failed = false;
+  let firstError;
+  for (const component of list) {
+    // 한 컴포넌트의 렌더링 에러가 다른 컴포넌트의 갱신을 막지 않게 하고, 첫 에러를 다시 던진다
+    try {
+      component.update();
+    } catch (error) {
+      if (!failed) [failed, firstError] = [true, error];
+    }
+  }
+  if (failed) throw firstError;
+}
+
+setEventRunner(batch);
 
 // ---------------------------------------------------------------- h()
 // 컴포넌트가 Virtual DOM을 반환할 때 쓰는 도우미. 함수형 태그(자식 컴포넌트)는 즉시 호출한다.
@@ -66,7 +102,7 @@ function isVnode(x) {
 }
 
 // ---------------------------------------------------------------- FunctionComponent
-
+//hooks 배열(상태 저장), mount()(첫 렌더링), update()(재렌더링)
 export class FunctionComponent {
   constructor(fn, props = {}) {
     this.fn = fn;
@@ -80,6 +116,7 @@ export class FunctionComponent {
     this.mounted = false;
     this.isRendering = false;
     this.pendingEffects = [];
+    this.lastChanges = []; // 가장 최근 update()의 Diff 결과
     // 렌더링 중의 Hook 기록 변경(effect deps, memo 값·deps)은 여기에 임시로 모아 두고,
     // 컴포넌트 함수가 성공한 뒤에만 확정한다. 실패한 렌더는 마지막 정상 렌더의 기록을 건드리지 않는다.
     this.staged = [];
@@ -102,7 +139,9 @@ export class FunctionComponent {
     if (!this.mounted) throw new Error("mount() 전에는 update()할 수 없습니다.");
     if (this.isRendering) throw new Error("렌더링 중에는 상태를 변경할 수 없습니다.");
     const next = this.#renderVdom();
-    this.rootEl = patch(this.rootEl, diff(this.vdom, next));
+    const changes = diff(this.vdom, next);
+    this.rootEl = patch(this.rootEl, changes);
+    this.lastChanges = changes; // 마지막 update()에서 만든 변경 목록 (테스트·검증용)
     this.vdom = next;
     this.#runEffects();
   }
@@ -188,7 +227,7 @@ function depsChanged(prev, next) {
   if (!prev || !next || prev.length !== next.length) return true;
   return next.some((value, i) => !Object.is(value, prev[i]));
 }
-
+//값 저장과 변경. 변경되면 자동으로 다시 그린다. 같은 값(Object.is)이면 무시
 export function useState(initial) {
   const { component, index } = hookContext("useState");
   let hook = slot(component, index, "state");
@@ -199,13 +238,17 @@ export function useState(initial) {
       if (Object.is(value, hook.value)) return;
       if (component.isRendering) throw new Error("렌더링 중에는 setState를 호출할 수 없습니다.");
       hook.value = value;
+      if (batchDepth > 0) {
+        dirty.add(component); // batch 안: 값만 바꾸고 렌더링은 batch가 끝날 때 한 번
+        return;
+      }
       component.update(); // 상태가 바뀌면 자동으로 다시 그린다 (P2-11)
     };
     component.hooks[index] = hook;
   }
   return [hook.value, hook.set];
 }
-
+//DOM 반영 후 실행. 의존성이 바뀌면 이전 cleanup을 먼저 호출한 뒤 실행
 export function useEffect(effect, deps) {
   const { component, index } = hookContext("useEffect");
   let hook = slot(component, index, "effect");
@@ -220,7 +263,7 @@ export function useEffect(effect, deps) {
     if (shouldRun) component.pendingEffects.push({ hook, effect });
   });
 }
-
+//	계산 결과 캐시. 의존성이 같으면 재사용
 export function useMemo(factory, deps) {
   const { component, index } = hookContext("useMemo");
   const hook = slot(component, index, "memo");

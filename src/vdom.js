@@ -10,16 +10,16 @@ export const TEXT = "text";
 export function domToVdom(node) {
   if (node.nodeType === Node.TEXT_NODE) {
     return { type: TEXT, value: node.nodeValue };
-  }
-  if (node.nodeType !== Node.ELEMENT_NODE) return null; // 주석 등
-  const tag = node.localName;
+  }//종류:텍스트 내용: 그 글자 반환
+  if (node.nodeType !== Node.ELEMENT_NODE) return null; 
+  const tag = node.localName; 
   if (tag === "script") return null;
 
   const props = {};
-  for (const attr of node.attributes) props[attr.name] = attr.value;
+  for (const attr of node.attributes) props[attr.name] = attr.value;//이름: 값 형태로 props에 넣기
 
   return { type: ELEMENT, tag, props, children: childrenToVdom(childContainer(node).childNodes) };
-}
+}//{ 종류: 요소, 태그 이름, 속성 상자, 자식들 } 객체를 만들어서 돌려주는데 자식 하나하나도 childrenToVdom 함수로 변환한 결과를 받아서 맨위 노드 하나만 넣으면 트리 전체 객체로 바뀌게
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 
