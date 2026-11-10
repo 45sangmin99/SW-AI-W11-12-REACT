@@ -1,42 +1,58 @@
-# Mini React
+# Mini React · 물류 허브 시뮬레이터
 
-React 없이 브라우저 DOM을 Virtual DOM으로 바꾸고, 두 트리의 차이만 실제 DOM에 반영하는 학습 프로젝트입니다. 함수형 Component와 `useState`, `useEffect`, `useMemo`도 Vanilla JavaScript로 구현했습니다.
+같은 허브에서 출발한 트럭 세 대가 서로 다른 속도로 이동하다가 분류 허브에서 세 배송지로 갈라집니다. 한 단계 진행하거나 되돌리면 차량 위치, 배송 현황, 이동 기록이 함께 바뀝니다.
 
-검증 페이지는 두 실습으로 나뉩니다.
+이 화면은 Vanilla JavaScript로 직접 구현한 **Mini React** 엔진으로 동작합니다. 함수형 컴포넌트의 상태가 바뀌면 이전 Virtual DOM과 새 Virtual DOM을 비교해 달라진 부분만 실제 DOM에 반영합니다.
 
-- **실습 1 — Virtual DOM:** 사용자가 편집한 트리를 Diff하고 Patch와 History를 확인합니다.
-- **실습 2 — State와 Hooks:** 할 일 앱을 조작하며 State 변경이 Component 재실행과 DOM Patch로 이어지는 과정을 확인합니다.
+## 시뮬레이터 미리보기
 
-## 실행
+![동부 배송지에 첫 트럭이 도착하고, 나머지 두 트럭이 이동 중인 물류 네트워크. 배송 중 6건, 완료 3건.](docs/logistics-preview.jpg)
 
-Node.js가 필요합니다. 프로젝트 폴더에서 다음 명령을 실행합니다.
+*시뮬레이션 6분. T-01이 먼저 도착했고, T-02와 T-03은 각 배송지로 이동 중입니다.*
+
+## 실행 방법
+
+Node.js가 설치된 환경에서 프로젝트 폴더를 열고 개발 서버를 실행합니다.
 
 ```powershell
 node --run dev
 ```
 
-브라우저에서 <http://127.0.0.1:3000>을 엽니다. 서버를 종료할 때는 터미널에서 `Ctrl+C`를 누릅니다.
+[Mini React 실습](http://127.0.0.1:3000/)을 열고 **물류 시뮬레이터 열기**를 누르거나, [시뮬레이터](http://127.0.0.1:3000/logistics.html)로 바로 이동합니다. 서버를 끄려면 터미널에서 `Ctrl+C`를 누릅니다.
 
-전체 테스트:
+## 시뮬레이터 체험
 
-```powershell
-node --run test
+1. **한 단계 진행**을 누르면 시뮬레이션 시간이 1분 흐릅니다. 세 트럭이 각각 60, 45, 36km/h에 맞는 거리만큼 이동합니다.
+2. 경과 6분까지 진행하면 T-01이 동부 배송지에 도착해 **완료 3건 · 배송 중 6건**이 됩니다. 지도에서 나머지 두 차량의 위치도 확인할 수 있습니다.
+3. **한 단계 이전**을 누르면 5분 시점으로 돌아갑니다. T-01이 다시 이동 중이 되고 배송 현황과 이동 기록도 복원됩니다.
+4. **자동 진행 시작**을 누르면 실제 1초마다 시뮬레이션 시간이 1분씩 흐릅니다. 도중에 되돌리려면 먼저 **자동 진행 정지**를 누르세요. 세 차량이 모두 도착하면 **완료 9건 · 완료율 100%**에서 멈춥니다.
+
+## Mini React 검증 실습
+
+### 실습 1 — Virtual DOM, Diff, Patch
+
+1. 오른쪽 **테스트 영역**에서 샘플 제목이나 본문을 수정하고 **Patch 적용**을 누릅니다.
+2. 왼쪽 **실제 영역**에 수정한 부분만 반영되는지 확인합니다. **최근 결과**와 **내부 동작 보기**에서 변경 유형과 원본 Patch JSON을 볼 수 있습니다.
+3. **이전 상태**와 **다음 상태**를 눌러 저장된 Virtual DOM 상태를 이동합니다. 실제 영역과 테스트 영역이 함께 복원됩니다.
+
+### 실습 2 — Component, State, Hooks
+
+1. 입력창에 할 일을 적어 추가한 뒤, 항목의 완료 상태를 변경합니다.
+2. **전체 · 진행 중 · 완료** 필터를 바꿔 목록과 요약 숫자가 어떻게 달라지는지 확인합니다.
+3. **최근 사용자 행동과 내부 결과**와 **내부 동작 보기**에서 사용자 조작이 상태 변경과 실제 DOM Patch로 이어지는 과정을 확인합니다.
+
+## 엔진 동작 원리
+
+```text
+사용자 조작 → 루트 상태 변경 → 함수형 컴포넌트 재실행
+→ Virtual DOM 생성 및 비교 → 필요한 변경만 실제 DOM에 적용
 ```
 
-## 실습 1 — Virtual DOM, Diff, Patch
+실습 1에서는 편집한 테스트 DOM을 직접 Virtual DOM으로 읽어 이전 상태와 비교합니다. 실습 2와 시뮬레이터에서는 루트 상태가 바뀔 때 같은 Diff·Patch 경로를 자동으로 실행합니다. 예를 들어 시뮬레이터를 한 단계 진행하면 이동한 트럭의 위치와 달라진 지표를 갱신하고, 영향 없는 허브의 DOM 노드는 재사용합니다.
 
-1. 오른쪽 **테스트 영역**의 글이나 HTML 구조를 직접 수정합니다.
-2. **Patch 적용**을 누릅니다.
-3. 왼쪽 **실제 영역**에 변경된 부분만 반영되는지 확인합니다.
-4. **최근 결과**에서 생성·삭제·교체·속성·텍스트 변경 개수를 확인합니다.
-5. **이전 상태**와 **다음 상태**로 저장된 Virtual DOM History를 이동합니다.
-6. 필요하면 **내부 동작 보기**를 펼쳐 Virtual DOM과 원본 Patch JSON을 확인합니다.
+### Diff가 처리하는 변경
 
-`Patch 적용`은 개발 서버의 새로고침이 아닙니다. 편집 중인 테스트 DOM을 새 Virtual DOM으로 읽고, 이전 Virtual DOM과 비교한 결과를 실제 영역에 적용하는 명시적인 실험 버튼입니다.
-
-### Diff 알고리즘
-
-이 프로젝트의 Diff는 두 트리를 같은 위치부터 재귀 비교하는 자체 구현 알고리즘입니다. 다음 핵심 케이스를 처리합니다.
+두 트리를 같은 위치부터 재귀적으로 비교하고, `key`가 있는 목록은 항목의 정체성을 기준으로 비교합니다.
 
 | 비교 결과 | Patch | 실제 DOM 처리 |
 | --- | --- | --- |
@@ -48,48 +64,34 @@ node --run test
 | 같은 타입의 자식 | 재귀 비교 | 기존 노드를 재사용하며 하위 변경 탐색 |
 | `key`가 있는 목록의 순서 변경 | `MOVE` | 같은 항목을 식별해 이동 |
 
-장점은 구현과 Patch 결과를 따라가기 쉽고, 변경되지 않은 DOM 노드를 재사용한다는 점입니다. 반면 실제 React의 Fiber, 우선순위 렌더링, 휴리스틱 최적화까지 구현한 알고리즘은 아닙니다.
+### State와 Hooks
 
-## 실습 2 — Component, State, Hooks
+State와 Hook은 각 앱의 루트 컴포넌트가 관리합니다. 자식 컴포넌트는 부모가 넘긴 값과 콜백을 props로 받아 사용합니다. 할 일 앱에서는 입력폼·필터·목록·요약이 루트 상태를 공유합니다.
 
-1. 입력창에 할 일을 적고 **할 일 추가**를 누릅니다.
-2. 항목의 체크박스를 눌러 완료 상태를 변경합니다.
-3. **전체 · 진행 중 · 완료** 필터로 표시 목록을 바꿉니다.
-4. 개수 요약과 **최근 사용자 행동과 내부 결과**를 확인합니다.
-5. 필요하면 **내부 동작 보기**에서 Component Patch JSON을 확인합니다.
+- `useState`는 할 일 목록이나 차량 위치 같은 상태를 유지하고, setter가 호출되면 화면 갱신을 시작합니다.
+- `useEffect`는 할 일 개수를 문서 제목에 반영하거나 시뮬레이터 타이머를 관리합니다. 자동 진행을 정지하면 타이머를 정리합니다.
+- `useMemo`는 할 일 필터 결과나 배송 현황을 계산합니다. 차량 상태가 그대로인 시작·정지 조작에서는 기존 배송 현황 계산 결과를 재사용합니다.
 
-각 조작은 다음 흐름으로 이어집니다.
+## 코드 구조와 테스트
 
-```text
-사용자 행동 → 루트 State 변경 → Component 재실행 → Virtual DOM Diff → 실제 DOM Patch
+| 역할 | 주요 파일 |
+| --- | --- |
+| DOM과 Virtual DOM 변환 | `src/vdom.js`, `src/render.js` |
+| 변경 계산과 적용 | `src/diff.js`, `src/patch.js` |
+| 함수형 컴포넌트와 Hooks | `src/component.js` |
+| 실습과 상태 이력 | `src/main.js`, `src/history.js`, `src/todos.js`, `src/patch-summary.js` |
+| 물류 화면과 이동 계산 | `logistics.html`, `src/logistics.js` |
+| 개발 서버 | `scripts/dev-server.js` |
+
+```powershell
+node --run test
 ```
 
-### State 소유권과 Hook 역할
+테스트는 Virtual DOM 변환, Diff·Patch, Hooks, 상태 이력과 함께 차량별 이동 거리, 최종 도착, 한 단계 이전으로의 복원, 영향 없는 DOM 노드의 재사용을 검증합니다.
 
-- `TodoApp`만 `todos`, `filter`, `draft` State를 소유합니다.
-- 입력폼, 필터, 목록, 요약은 State를 만들지 않고 부모가 전달한 props만 사용합니다. 이것이 **Lifting State Up**입니다.
-- `useState`는 할 일·필터·입력값을 저장하고 setter 호출 직후 다시 렌더링합니다.
-- `useMemo`는 `todos` 또는 `filter`가 바뀔 때만 표시 목록을 다시 계산합니다.
-- `useEffect`는 할 일 개수를 문서 제목에 반영하고 unmount 시 이전 제목을 복구합니다.
+## 실제 React와의 차이
 
-## 코드 구조
-
-- `src/vdom.js`: 실제 DOM을 Virtual DOM으로 변환
-- `src/render.js`: Virtual DOM을 실제 DOM으로 렌더링
-- `src/diff.js`: 이전·다음 Virtual DOM을 비교해 Patch 생성
-- `src/patch.js`: Patch를 실제 DOM에 적용
-- `src/history.js`: Virtual DOM 스냅샷의 이전·다음 상태 관리
-- `src/component.js`: `FunctionComponent`, `useState`, `useEffect`, `useMemo`
-- `src/todos.js`: 할 일 필터·완료 전환·문서 제목 동기화 로직
-- `src/patch-summary.js`: Patch를 사람이 읽을 수 있는 결과로 변환
-- `src/main.js`: 두 실습을 엔진과 연결
-- `tests/`: 엔진 단위 테스트와 개발 서버 기능 테스트
-
-## 실제 React와 다른 점
-
-- 하나의 루트 `FunctionComponent`에서만 State와 Hook을 사용합니다.
-- State setter는 batching 없이 즉시 렌더링합니다.
-- `useEffect`는 DOM Patch 직후 동기 실행됩니다.
-- 이벤트 핸들러를 렌더마다 새로 만들기 때문에 `UPDATE_PROPS` 수가 화면 변화보다 많아질 수 있습니다.
-- JSX, Fiber, Concurrent Rendering, Synthetic Event, 서버 렌더링은 구현하지 않았습니다.
-- 할 일은 메모리에만 있으며 새로고침하면 초기 상태로 돌아갑니다.
+- 앱마다 하나의 루트 `FunctionComponent`에서 State와 Hook을 관리합니다.
+- State setter는 batching 없이 즉시 렌더링을 시작하고, `useEffect`는 DOM Patch 직후 동기 실행됩니다.
+- 렌더링마다 새 이벤트 핸들러를 만들기 때문에 화면의 텍스트나 구조가 그대로여도 `UPDATE_PROPS`가 생길 수 있습니다.
+- JSX, Fiber, 우선순위 렌더링, Synthetic Event, 서버 렌더링은 구현 범위 밖입니다.
