@@ -3,10 +3,23 @@
 // ⑥ 진행 현황(F-08)과 ⑦ 성능 비교는 Step 4 전용이라 여기에 없다.
 import { h } from "../mini-react.js";
 import { CONFIG } from "./config.js";
-import { SIGNAL_LABEL, SEVERITY_LABEL, formatRange, highlightSegments } from "./analysis.js";
+import { SIGNAL_LABEL, SEVERITY_LABEL, formatRangeShort, highlightSegments } from "./analysis.js";
 import { pageWindow } from "./pagination.js";
 
-const STATUS_TEXT = { loading: "불러오는 중…", empty: "표시할 내용이 없습니다.", error: "문제가 발생했습니다." };
+const STATUS_TEXT = { loading: "불러오는 중", empty: "표시할 내용이 없습니다", error: "문제가 발생했습니다" };
+
+// 선 아이콘은 라이브러리 없이 인라인 SVG로 그린다 (16px, 선 1.5, 글자색을 따름)
+const icon = (...paths) =>
+  h(
+    "svg",
+    { class: "icon", viewBox: "0 0 16 16", width: 16, height: 16, fill: "none", stroke: "currentColor", "stroke-width": 1.5, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true" },
+    paths.map((d) => h("path", { d })),
+  );
+
+/** 심각도: 색 알약 대신 점 + 글자. 높음=채운 악센트 점, 중간=속이 빈 악센트 점, 낮음=흐린 점 (색만으로 구분하지 않는다) */
+function Severity({ level }) {
+  return h("span", { class: `sev sev-${level}` }, h("i", { class: "dot", "aria-hidden": "true" }), SEVERITY_LABEL[level]);
+}
 
 // ---------------------------------------------------------------- 공통: StatusView (F-03)
 export function StatusView({ status, message }) {
@@ -26,6 +39,7 @@ export function Header({ isGenerated }) {
     isGenerated
       ? h("span", { class: "badge", title: "가상의 회사 OBJECT NOTE의 시연용 데이터입니다. 실제 고객 문의가 아닙니다." }, "생성 데이터")
       : null,
+    h("span", { class: "note" }, "시간은 UTC 기준"),
   );
 }
 
@@ -37,7 +51,7 @@ export function FilterBar({ query, period, category, device, appVersion, appVers
   return h(
     "section",
     { class: "filter-bar", "aria-label": "필터" },
-    field("문의 검색", h("input", { type: "search", name: "query", value: query, placeholder: "문의 내용에서 찾기", autocomplete: "off", onInput: (e) => onQuery(e.target.value) })),
+    field("문의 검색", h("input", { type: "search", name: "query", value: query, placeholder: "문의 내용", autocomplete: "off", onInput: (e) => onQuery(e.target.value) })),
     field("기간", h("select", { name: "period", value: period, onChange: (e) => onPeriod(e.target.value) }, CONFIG.PERIODS.map((p) => h("option", { value: p.value }, p.label)))),
     field("유형", h("select", { name: "category", value: category, onChange: (e) => onCategory(e.target.value) }, allOption("전체 유형"), CONFIG.CATEGORIES.map((c) => h("option", { value: c }, c)))),
     field("기기", h("select", { name: "device", value: device, onChange: (e) => onDevice(e.target.value) }, allOption("전체 기기"), CONFIG.DEVICES.map((d) => h("option", { value: d }, d)))),
@@ -49,7 +63,7 @@ export function FilterBar({ query, period, category, device, appVersion, appVers
 // ---------------------------------------------------------------- ③ SummaryCard (F-05)
 export function SummaryCard({ summary, status, message }) {
   if (status !== "ready") return h("section", { class: "summary" }, h(StatusView, { status, message }));
-  if (summary.count === 0) return h("section", { class: "summary" }, h(StatusView, { status: "empty", message: "조건에 맞는 문의가 없습니다." }));
+  if (summary.count === 0) return h("section", { class: "summary" }, h(StatusView, { status: "empty", message: "조건에 맞는 문의가 없습니다" }));
   return h(
     "section",
     { class: "summary", "aria-label": "요약" },
@@ -63,7 +77,7 @@ export function SummaryCard({ summary, status, message }) {
 export function SignalList({ alerts, selectedId, onSelect, status, message }) {
   let body;
   if (status !== "ready") body = h(StatusView, { status, message });
-  else if (alerts.length === 0) body = h(StatusView, { status: "empty", message: "감지된 이상 신호가 없습니다." });
+  else if (alerts.length === 0) body = h(StatusView, { status: "empty", message: "감지된 이상 신호가 없습니다" });
   else {
     body = h(
       "ul",
@@ -80,9 +94,14 @@ export function SignalList({ alerts, selectedId, onSelect, status, message }) {
               "aria-pressed": a.id === selectedId ? "true" : "false",
               onClick: () => onSelect(a.id),
             },
-            h("span", { class: "alert-head" }, h("span", { class: `sev sev-${a.severity}` }, SEVERITY_LABEL[a.severity]), h("span", { class: "alert-type" }, SIGNAL_LABEL[a.type])),
-            h("span", { class: "alert-scope", title: a.scopeLabel }, a.scopeLabel),
-            h("span", { class: "alert-time" }, formatRange(a.startHour, a.endHour)),
+            // 첫 줄: 무슨 신호인가 · 어디서 + 심각도 / 둘째 줄: 평소와 비교해 얼마나 + 언제
+            h(
+              "span",
+              { class: "alert-head" },
+              h("span", { class: "alert-title", title: `${SIGNAL_LABEL[a.type]} · ${a.scopeLabel}` }, h("span", { class: "alert-type" }, SIGNAL_LABEL[a.type]), h("span", { class: "alert-scope" }, a.scopeLabel)),
+              h(Severity, { level: a.severity }),
+            ),
+            h("span", { class: "alert-meta" }, h("span", { class: "alert-metric" }, a.metricLabel), h("span", { class: "alert-time" }, formatRangeShort(a.startHour, a.endHour))),
           ),
         ),
       ),
@@ -96,7 +115,7 @@ export function SignalReason({ alert }) {
   return h(
     "div",
     { class: "reason" },
-    h("h3", null, `${SIGNAL_LABEL[alert.type]} · ${alert.type === "repeat" ? "같은 문구" : alert.category}`, h("span", { class: `sev sev-${alert.severity}` }, SEVERITY_LABEL[alert.severity])),
+    h("h3", null, `${SIGNAL_LABEL[alert.type]} · ${alert.type === "repeat" ? "같은 문구" : alert.category}`, h(Severity, { level: alert.severity })),
     h("p", null, alert.reason),
   );
 }
@@ -107,14 +126,14 @@ export function SignalReason({ alert }) {
 const r2 = (n) => Math.round(n * 100) / 100;
 
 export function BarChart({ title, bars }) {
-  const W = 560, H = 210, L = 34, R = 8, T = 22, B = 30;
+  const W = 640, H = 220, L = 48, R = 8, T = 24, B = 32; // 왼쪽 여백 48: 좁은 화면에서 글자(그림 단위)가 커져도 세로축 숫자가 잘리지 않게
   const plotW = W - L - R;
   const plotH = H - T - B;
   const max = Math.max(1, ...bars.map((b) => b.value));
   const slot = plotW / Math.max(bars.length, 1);
   const few = bars.length <= 12; // 막대가 적으면 값과 이름을 모두, 많으면 몇 개만
   const barW = Math.max(1, slot * (few ? 0.6 : 0.8));
-  const labelEvery = few ? 1 : Math.ceil(bars.length / 6);
+  const labelEvery = few ? 1 : Math.ceil(bars.length / 4); // 막대가 많으면 이름을 4개 안팎만: 좁은 화면에서 글자가 커져도 겹치지 않게
   const nameOf = (b) => (few ? b.label : (b.short ?? b.label));
 
   const rects = bars.map((b, i) => {
@@ -130,7 +149,7 @@ export function BarChart({ title, bars }) {
   );
   const values = few
     ? bars.map((b, i) =>
-        h("text", { x: r2(L + i * slot + slot / 2), y: r2(T + plotH - (b.value / max) * plotH - 4), class: "value-label", "text-anchor": "middle" }, b.value),
+        h("text", { x: r2(L + i * slot + slot / 2), y: r2(T + plotH - (b.value / max) * plotH - 6), class: "value-label", "text-anchor": "middle" }, b.value),
       )
     : [];
 
@@ -142,8 +161,8 @@ export function BarChart({ title, bars }) {
       "svg",
       { class: "chart-svg", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${title}, 최댓값 ${max}건` },
       h("line", { class: "axis", x1: L, y1: T + plotH, x2: W - R, y2: T + plotH }),
-      h("text", { x: L - 4, y: T + 4, class: "axis-label", "text-anchor": "end" }, max),
-      h("text", { x: L - 4, y: T + plotH, class: "axis-label", "text-anchor": "end" }, 0),
+      h("text", { x: L - 6, y: T + 4, class: "axis-label", "text-anchor": "end" }, max),
+      h("text", { x: L - 6, y: T + plotH, class: "axis-label", "text-anchor": "end" }, 0),
       rects,
       values,
       labels,
@@ -161,13 +180,13 @@ export function Pager({ page, totalPages, onPageChange }) {
   return h(
     "nav",
     { class: "pager", "aria-label": "근거 문의 페이지" },
-    h("button", { type: "button", class: "btn btn-ghost", disabled: page <= 1, onClick: () => onPageChange(page - 1), "aria-label": "이전 페이지" }, "◀"),
+    h("button", { type: "button", class: "btn btn-ghost", disabled: page <= 1, onClick: () => onPageChange(page - 1), "aria-label": "이전 페이지" }, icon("M10 3 5 8l5 5")),
     pageWindow(page, totalPages).map((n) =>
       n === "…"
         ? h("span", { class: "pager-gap" }, "…")
         : h("button", { type: "button", class: n === page ? "btn page current" : "btn page", "aria-current": n === page ? "page" : "false", onClick: () => onPageChange(n) }, n),
     ),
-    h("button", { type: "button", class: "btn btn-ghost", disabled: page >= totalPages, onClick: () => onPageChange(page + 1), "aria-label": "다음 페이지" }, "▶"),
+    h("button", { type: "button", class: "btn btn-ghost", disabled: page >= totalPages, onClick: () => onPageChange(page + 1), "aria-label": "다음 페이지" }, icon("m6 3 5 5-5 5")),
   );
 }
 
@@ -179,7 +198,7 @@ function InquiryItem({ inquiry, phrases }) {
       "div",
       { class: "inquiry-meta" },
       h("span", { class: "inquiry-id" }, `#${inquiry.id}`),
-      h("span", { class: "tag" }, inquiry.category),
+      h("span", { class: "inquiry-cat" }, inquiry.category),
       h("span", null, inquiry.device),
       h("span", null, inquiry.app_version),
       h("span", null, inquiry.created_at.slice(0, 16).replace("T", " ")),
@@ -202,7 +221,7 @@ export function EvidenceList({ alert, evidence, onPageChange }) {
 export function SignalDetail({ alert, evidence, onPageChange, status, message }) {
   let body;
   if (status !== "ready") body = h(StatusView, { status, message });
-  else if (!alert) body = h(StatusView, { status: "empty", message: "위 목록에서 이상 신호를 선택하세요." });
+  else if (!alert) body = h(StatusView, { status: "empty", message: "위 목록에서 이상 신호를 선택하세요" });
   else body = h("div", { class: "detail-body" }, h(SignalReason, { alert }), h(SignalChart, { alert }), h(EvidenceList, { alert, evidence, onPageChange }));
   return h("section", { class: "panel signal-detail", "aria-label": "신호 상세" }, body);
 }

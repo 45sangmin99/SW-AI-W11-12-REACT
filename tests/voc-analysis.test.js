@@ -1,7 +1,7 @@
 // 고객 문의(VOC) 이상 탐지 로직 단위 테스트 (순수 함수): 시간·필터·요약·4신호 탐지·정규화·페이지·데이터 불러오기·샘플 정답지
 import { describe, it, assert, eq, deepEq, throws } from "./runner.js";
 import {
-  hourOf, eachHour, hourRange, formatHour, formatRange, filterInquiries, sinceHour, inPeriod, summarize,
+  hourOf, eachHour, hourRange, formatHour, formatRange, formatRangeShort, filterInquiries, sinceHour, inPeriod, summarize,
   normalizePhrase, highlightSegments, detectAlerts,
 } from "../src/voc/analysis.js";
 import { paginate, pageWindow } from "../src/voc/pagination.js";
@@ -53,6 +53,12 @@ describe("시간 도우미", () => {
     eq(formatRange("2026-11-09T09", "2026-11-09T09"), "2026-11-09 09:00~09:59");
     eq(formatRange("2026-11-09T09", "2026-11-09T12"), "2026-11-09 09:00~12:59");
     eq(formatRange("2026-11-08T22", "2026-11-09T01"), "2026-11-08 22:00 ~ 2026-11-09 01:59");
+  });
+  it("formatRangeShort: 카드용으로 연도와 분을 뺀다 (끝은 그 시 정각까지: 12시대면 13시)", () => {
+    eq(formatRangeShort("2026-11-09T09", "2026-11-09T12"), "11-09 09~13시");
+    eq(formatRangeShort("2026-11-09T09", "2026-11-09T09"), "11-09 09~10시");
+    eq(formatRangeShort("2026-11-09T22", "2026-11-09T23"), "11-09 22~24시");
+    eq(formatRangeShort("2026-11-08T22", "2026-11-09T01"), "11-08 22시~11-09 02시");
   });
 });
 
@@ -119,6 +125,9 @@ describe("문의 급증 (C9, 승인된 설계: 유형별, 같은 시각 과거 �
     eq(alerts[0].evidence.length, 25);
     assert(Math.abs(alerts[0].score - 25 / 3) < 1e-9);
     eq(alerts[0].severity, "medium");
+    // 카드 문구: 어디서(scopeLabel)와 평소와 비교해 얼마나(metricLabel)
+    eq(alerts[0].scopeLabel, "쿠폰·할인");
+    eq(alerts[0].metricLabel, "평소의 8.3배");
   });
   it("20건 경계: 20건은 감지, 19건은 배수가 아무리 높아도 감지하지 않는다", () => {
     eq(ofType(run(spike(20, { perHour: 0 })), "surge").length, 1);
@@ -194,6 +203,8 @@ describe("유형 쏠림 (C9: 평소보다 20%p 이상, 그 시간 문의 20건 �
     const alerts = ofType(run(spikeOf(5, 20)), "category");
     deepEq(alerts.map((a) => a.category), ["배송"]);
     eq(alerts[0].severity, "medium");
+    eq(alerts[0].scopeLabel, "배송");
+    eq(alerts[0].metricLabel, "평소보다 +30%p");
     eq(alerts[0].evidence.length, 20);
     assert(alerts[0].reason.includes("80%") && alerts[0].reason.includes("50%") && alerts[0].reason.includes("30%p"));
   });
@@ -242,6 +253,8 @@ describe("기기·버전 쏠림 (C9: 한 기기 또는 앱 버전 70% 이상, 20
     deepEq(alert.charts[0].bars.filter((b) => b.highlight).map((b) => b.label), ["Android"]);
     assert(alert.charts[1].bars.some((b) => b.label === "4.4.0" && b.highlight));
     assert(alert.reason.includes("Android") && alert.reason.includes("4.4.0"));
+    eq(alert.scopeLabel, "로그인·계정");
+    assert(/^Android \d+% · 앱 4\.4\.0 \d+%$/.test(alert.metricLabel), alert.metricLabel);
   });
   it("70% 경계: 14/20은 감지, 13/20은 아니다", () => {
     const only = (androidCount) => (k) => (k < androidCount ? { device: "Android", app_version: ["4.2.0", "4.3.0", "4.4.0"][k % 3] } : { device: k % 2 ? "iOS" : "Web", app_version: k % 2 ? ["4.2.0", "4.3.0", "4.4.0"][k % 3] : "web" });
@@ -264,6 +277,7 @@ describe("기기·버전 쏠림 (C9: 한 기기 또는 앱 버전 70% 이상, 20
     assert(alert);
     assert(alert.reason.includes("Web 기기"));
     assert(!alert.reason.includes("앱 web"));
+    eq(alert.metricLabel, "Web 100%");
     deepEq(alert.charts[1].bars.map((b) => b.label), []);
   });
   it("skipDevice·skipVersion: 해당 필터가 켜져 있으면 그 항목은 판단하지 않는다", () => {
@@ -350,6 +364,8 @@ describe("반복 문구 (C9: 같은 문구가 1시간 안에 10건 이상, 문�
     const bars = alert.charts[0].bars;
     eq(bars.filter((b) => b.highlight).length, 1);
     eq(bars.find((b) => b.highlight).value, 12);
+    eq(alert.metricLabel, "한 시간 최대 12건 반복");
+    eq(alert.scopeLabel, alert.phrase);
   });
   it("서로 다른 반복 문구는 각각의 발생 건이다", () => {
     const other = "반품비가 왜 나왔어요 안내에 없던 금액이에요";

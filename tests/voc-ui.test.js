@@ -41,11 +41,11 @@ const text = (el) => el.textContent.replace(/\s+/g, " ").trim();
 const card = ({ $$ }, label, scope) =>
   $$(".alert-card").find((b) => b.querySelector(".alert-type").textContent === label && (!scope || b.querySelector(".alert-scope").textContent.includes(scope)));
 const cardLabels = ({ $$ }) => $$(".alert-card").map((b) => `${b.querySelector(".alert-type").textContent}|${b.querySelector(".alert-scope").textContent}`);
-/** 기기·버전 쏠림 카드의 범위 문구 ("로그인·계정 · Android 기기 97% · 앱 4.4.0 버전 …"). 유형 이름("기기·버전 쏠림")은 빼고 본다 */
-const envScopes = ({ $$ }) =>
+/** 기기·버전 쏠림 카드의 "얼마나" 문구 (예: "Android 97% · 앱 4.4.0 94%") */
+const envMetrics = ({ $$ }) =>
   $$(".alert-card")
     .filter((b) => b.querySelector(".alert-type").textContent === "기기·버전 쏠림")
-    .map((b) => b.querySelector(".alert-scope").textContent);
+    .map((b) => b.querySelector(".alert-metric").textContent);
 const nextPage = ({ $ }, times = 1) => {
   for (let i = 0; i < times; i++) click($('.pager button[aria-label="다음 페이지"]'));
 };
@@ -208,7 +208,7 @@ describe("필터 → 관련 영역만 갱신 (R-03, R-06, T-04, P2-32, 4.3.2)", 
       choose($("select[name=period]"), "24h");
       const cards = $$(".alert-card");
       assert(cards.length > 0 && cards.length < expectedAlertCount(data));
-      assert(cards.every((b) => b.querySelector(".alert-time").textContent.startsWith("2026-11-09")), "마지막 날 신호만");
+      assert(cards.every((b) => b.querySelector(".alert-time").textContent.startsWith("11-09")), "마지막 날 신호만");
       assert(cardLabels({ $$ }).some((l) => l.startsWith("문의 급증|로그인·계정")), "이력을 잘랐다면 급증을 판정하지 못한다");
       const onLastDay = data.inquiries.filter((q) => q.created_at.startsWith("2026-11-09")).length;
       assert(text($(".summary")).includes(`${onLastDay.toLocaleString("ko-KR")}건`), "요약 건수도 기간에 맞는다");
@@ -228,18 +228,18 @@ describe("필터 → 관련 영역만 갱신 (R-03, R-06, T-04, P2-32, 4.3.2)", 
   it("기기 필터: 기기 쏠림은 계산하지 않고 앱 버전 쏠림만 남는다", async () => {
     await withApp((app) => {
       choose(app.$("select[name=device]"), "Android");
-      const env = envScopes(app);
+      const env = envMetrics(app);
       assert(env.length > 0, "버전 쏠림은 남는다");
-      assert(env.every((s) => !s.includes("기기")), env.join()); // 범위 문구에 "~ 기기 N%"가 없다
+      assert(env.every((s) => s.includes("앱 ") && !/Android|iOS|Web/.test(s)), env.join()); // 기기 비율은 없고 앱 버전 비율만 있다
     });
   });
 
   it("앱 버전 필터: 버전 쏠림은 계산하지 않고 기기 쏠림만 남는다", async () => {
     await withApp((app) => {
       choose(app.$("select[name=appVersion]"), "4.4.0");
-      const env = envScopes(app);
+      const env = envMetrics(app);
       assert(env.length > 0, "기기 쏠림은 남는다");
-      assert(env.every((s) => !s.includes("버전")), env.join()); // 범위 문구에 "앱 ~ 버전 N%"가 없다
+      assert(env.every((s) => !s.includes("앱 ") && /Android|iOS|Web/.test(s)), env.join()); // 앱 버전 비율은 없고 기기 비율만 있다
     });
   });
 

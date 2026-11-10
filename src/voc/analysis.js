@@ -46,6 +46,16 @@ export function formatRange(startHour, endHour) {
   return `${d1} ${h1}:00 ~ ${d2} ${h2}:59`;
 }
 
+/**
+ * 카드용 짧은 구간 표시. 연도와 분은 reason에 정확히 있으므로 뺀다 (끝 시각은 그 시 정각까지, 즉 12시대면 13시).
+ * 예: "11-09 09~13시", 날짜가 다르면 "11-08 22시~11-09 02시"
+ */
+export function formatRangeShort(startHour, endHour) {
+  const [d1, h1, d2, h2] = [startHour.slice(5, 10), startHour.slice(11), endHour.slice(5, 10), endHour.slice(11)];
+  const end = String(Number(h2) + 1).padStart(2, "0");
+  return d1 === d2 ? `${d1} ${h1}~${end}시` : `${d1} ${h1}시~${d2} ${end}시`;
+}
+
 // ---------------------------------------------------------------- 필터 · 요약
 /** 검색어(문의 내용에 포함), 유형, 기기, 앱 버전으로 거른다. 기간은 따로 다룬다 (아래 sinceHour) */
 export function filterInquiries(list, { query = "", category = "all", device = "all", appVersion = "all" } = {}) {
@@ -303,6 +313,7 @@ function buildSurge(run, ctx) {
     type: "surge",
     category,
     scopeLabel: category,
+    metricLabel: `평소의 ${ratio.toFixed(1)}배`, // 카드에서 "얼마나"를 평소와 비교해 말한다 (정확한 건수는 reason에)
     startHour,
     endHour,
     severity: severityBySteps(ratio, CONFIG.SURGE_RATIO_MEDIUM, CONFIG.SURGE_RATIO_HIGH),
@@ -327,7 +338,8 @@ function buildCategory(run, ctx) {
     id: `category:${category}:${startHour}`,
     type: "category",
     category,
-    scopeLabel: `${category} · 비율 ${pct(peak.now)}%`,
+    scopeLabel: category,
+    metricLabel: `평소보다 +${pct(peak.diff)}%p`,
     startHour,
     endHour,
     severity: severityBySteps(peak.diff, CONFIG.CATEGORY_DIFF_MEDIUM, CONFIG.CATEGORY_DIFF_HIGH),
@@ -365,7 +377,11 @@ function buildEnv(run, ctx) {
     id: `env:${category}:${startHour}`,
     type: "env",
     category,
-    scopeLabel: `${category} · ${parts.join(" · ")}`,
+    scopeLabel: category,
+    metricLabel: [
+      peak.dims.device && `${peak.dims.device.value} ${pct(peak.dims.device.share)}%`,
+      peak.dims.version && `앱 ${peak.dims.version.value} ${pct(peak.dims.version.share)}%`,
+    ].filter(Boolean).join(" · "),
     startHour,
     endHour,
     severity: severityBySteps(strength(peak), CONFIG.ENV_SHARE_MEDIUM, CONFIG.ENV_SHARE_HIGH),
@@ -397,6 +413,7 @@ function buildRepeat(run, ctx) {
     type: "repeat",
     category: null,
     scopeLabel: shown,
+    metricLabel: `한 시간 최대 ${peak.count}건 반복`,
     startHour,
     endHour,
     severity: severityBySteps(peak.count, CONFIG.REPEAT_MEDIUM, CONFIG.REPEAT_HIGH),

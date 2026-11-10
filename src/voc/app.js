@@ -33,7 +33,7 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
         batch(() => {
           setInquiries(loaded);
           setMeta(loadedMeta);
-          setLoadState({ status: "ready", message: skipped ? `형식이 올바르지 않은 ${skipped}건은 제외했습니다.` : "" });
+          setLoadState({ status: "ready", message: skipped ? `형식이 올바르지 않은 ${skipped}건은 제외했습니다` : "" });
         });
       })
       .catch((error) => {
