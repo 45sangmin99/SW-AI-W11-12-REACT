@@ -68,7 +68,9 @@ describe("StateHistory", () => {
 async function loadPage() {
   const frame = document.createElement("iframe");
   frame.style.cssText = "position:absolute;left:-9999px;width:800px;height:600px";
-  frame.src = "../index.html";
+  // 이 테스트 파일(tests/)의 위치 기준으로 index.html을 찾는다. "../index.html"처럼 문서 주소 기준으로 적으면
+  // 서버를 Mini_react의 상위 폴더에서 띄웠을 때 404가 난다
+  frame.src = new URL("../index.html", import.meta.url).href;
   document.body.appendChild(frame);
   await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
   await tick(20);
