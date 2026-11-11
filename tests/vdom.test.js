@@ -33,8 +33,9 @@ test("의미 있는 텍스트의 공백을 보존한다", () => {
   assert.equal(domToVdom(text(" Hello ")), " Hello ");
 });
 
-test("공백 텍스트와 지원하지 않는 노드는 제외한다", () => {
-  assert.equal(domToVdom(text("\n  ")), null);
+test("공백 텍스트를 보존하고 지원하지 않는 노드는 제외한다", () => {
+  assert.equal(domToVdom(text("\n  ")), "\n  ");
+  assert.equal(domToVdom(text(" ")), " ");
   assert.equal(domToVdom({ nodeType: 8, nodeValue: "comment" }), null);
   assert.equal(domToVdom(null), null);
 });
@@ -51,6 +52,7 @@ test("중첩된 자식을 순서대로 재귀 변환한다", () => {
     type: "ul",
     props: {},
     children: [
+      "\n  ",
       { type: "li", props: { "data-id": "a" }, children: ["A"] },
       { type: "li", props: { "data-id": "b" }, children: ["B"] },
     ],

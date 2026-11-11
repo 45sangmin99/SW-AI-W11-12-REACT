@@ -17,11 +17,16 @@ function compareProps(oldProps, newProps, path, patches) {
   }
 }
 
-function keyedChildren(children) {
+function keyedChildren(children, whitespaceKeys) {
   const keyed = new Map();
+  let whitespaceIndex = 0;
 
   children.forEach((child, index) => {
-    const key = getKey(child);
+    let key = getKey(child);
+    if (typeof child === "string" && !child.trim()) {
+      whitespaceKeys[whitespaceIndex] ??= Symbol();
+      key = whitespaceKeys[whitespaceIndex++];
+    }
 
     if (key === undefined) {
       throw new TypeError("Keyed children must all have a key.");
@@ -37,31 +42,34 @@ function keyedChildren(children) {
 }
 
 function compareKeyedChildren(oldChildren, newChildren, path, patches) {
-  const oldKeyed = keyedChildren(oldChildren);
-  const newKeyed = keyedChildren(newChildren);
-  const order = [];
+  // Match whitespace by occurrence without giving it a DOM key.
+  const whitespaceKeys = [];
+  const oldKeyed = keyedChildren(oldChildren, whitespaceKeys);
+  const newKeyed = keyedChildren(newChildren, whitespaceKeys);
 
-  for (const [key, { index }] of oldKeyed) {
+  for (const [key, { child, index }] of [...oldKeyed].reverse()) {
     if (!newKeyed.has(key)) {
-      patches.push({ type: "REMOVE", path: [...path, index], key });
-    } else {
-      order.push(oldKeyed.get(key));
+      patches.push({ type: "REMOVE", path: [...path, index], key: getKey(child) });
     }
   }
 
+  const order = [...oldKeyed.keys()].filter((key) => newKeyed.has(key));
   for (const [key, { child, index }] of newKeyed) {
     const previous = oldKeyed.get(key);
+    const domKey = getKey(child);
 
     if (!previous) {
-      patches.push({ type: "CREATE", path: [...path, index], node: child, key });
-      order.splice(index, 0, undefined);
+      patches.push({ type: "CREATE", path: [...path, index], node: child, key: domKey });
+      order.splice(index, 0, key);
       continue;
     }
 
-    if (order[index] !== previous) {
-      order.splice(order.indexOf(previous, index + 1), 1);
-      order.splice(index, 0, previous);
-      patches.push({ type: "MOVE", path, key, to: index });
+    if (oldKeyed.get(order[index]) !== previous) {
+      const from = order.findIndex((candidate) => oldKeyed.get(candidate) === previous);
+      order.splice(from, 1);
+      order.splice(index, 0, key);
+      const target = domKey === undefined ? { from } : { key: domKey };
+      patches.push({ type: "MOVE", path, ...target, to: index });
     }
 
     compare(previous.child, child, [...path, index], patches);

@@ -9,8 +9,7 @@ function childrenToVdom(node) {
 
 export function domToVdom(node) {
   if (node?.nodeType === TEXT_NODE) {
-    const text = node.nodeValue ?? "";
-    return text.trim() ? text : null;
+    return node.nodeValue ?? "";
   }
 
   if (node?.nodeType !== ELEMENT_NODE) {

@@ -101,12 +101,12 @@ test("연속된 자식 삭제를 뒤에서부터 안전하게 적용한다", () 
   assert.deepEqual(toVdom(patch(root, diff(oldTree, newTree), documentRef)), newTree);
 });
 
-test("실제 DOM의 들여쓰기 공백을 제외하고 Virtual DOM 경로를 찾는다", () => {
+test("실제 DOM의 들여쓰기 공백을 포함해 Virtual DOM 경로를 찾는다", () => {
   const documentRef = createDocument();
-  const oldTree = h("section", {}, [h("p", {}, ["Old"])]);
-  const newTree = h("section", {}, [h("p", {}, ["New"])]);
+  const oldTree = h("section", {}, ["\n  ", h("p", {}, ["Old"]), "\n"]);
+  const newTree = h("section", {}, ["\n  ", h("p", {}, ["New"]), "\n"]);
   const root = documentRef.createElement("section");
-  const paragraph = vdomToDom(oldTree.children[0], documentRef);
+  const paragraph = vdomToDom(oldTree.children[1], documentRef);
 
   root.appendChild(documentRef.createTextNode("\n  "));
   root.appendChild(paragraph);
@@ -170,6 +170,26 @@ test("key 재정렬 중 최종 인덱스가 같은 항목도 올바른 위치와
 
   assert.deepEqual(toVdom(updated), newTree);
   [d, b, c, a].forEach((node, index) => assert.equal(updated.childNodes[index], node));
+});
+
+test("공백 추가·삭제와 key 이동을 함께 적용하고 되돌린다", () => {
+  const documentRef = createDocument();
+  const a = h("span", { key: "a" }, ["Hello"]);
+  const b = h("span", { key: "b" }, ["World"]);
+  const before = h("div", {}, [a, " ", b]);
+  const after = h("div", {}, ["\n", b, a, " "]);
+  const root = vdomToDom(before, documentRef);
+  const [first, , last] = root.childNodes;
+
+  patch(root, diff(before, after), documentRef);
+  assert.deepEqual(toVdom(root), after);
+  assert.equal(root.childNodes[1], last);
+  assert.equal(root.childNodes[2], first);
+
+  patch(root, diff(after, before), documentRef);
+  assert.deepEqual(toVdom(root), before);
+  assert.equal(root.childNodes[0], first);
+  assert.equal(root.childNodes[2], last);
 });
 
 test("루트 교체·삭제·생성 결과를 반환한다", () => {

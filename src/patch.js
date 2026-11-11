@@ -2,8 +2,7 @@ import { removeDomProp, setDomProp, vdomToDom } from "./render.js";
 
 function vdomChildren(node) {
   return Array.from(node.childNodes).filter(
-    (child) => child.nodeType === 1
-      || (child.nodeType === 3 && child.nodeValue.trim()),
+    (child) => child.nodeType === 1 || child.nodeType === 3,
   );
 }
 
@@ -50,7 +49,9 @@ export function patch(root, patches, documentRef = globalThis.document) {
 
     if (change.type === "MOVE") {
       const parent = nodeAtPath(currentRoot, change.path);
-      const target = keyedChild(parent, change.key);
+      const target = change.key === undefined
+        ? vdomChildren(parent)[change.from]
+        : keyedChild(parent, change.key);
       target.remove();
       parent.insertBefore(target, vdomChildren(parent)[change.to] ?? null);
       continue;
