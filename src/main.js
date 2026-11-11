@@ -4,7 +4,7 @@ import { render } from "./dom.js";
 import { diff } from "./diff.js";
 import { patch } from "./patch.js";
 import { StateHistory } from "./history.js";
-
+//document.getElementById:[내장] htmld에서 id가 일치하는 요소 하나를 찾아서 돌려줌
 const realRoot = document.getElementById("real-root");
 const testRoot = document.getElementById("test-root");
 const testCode = document.getElementById("test-code");
@@ -13,12 +13,13 @@ const backBtn = document.getElementById("back-btn");
 const forwardBtn = document.getElementById("forward-btn");
 
 // P1-13: 로드 시 실제 영역의 샘플 HTML을 Virtual DOM으로 변환
-// 제외 노드(주석, <script>)를 먼저 지워서 Virtual DOM 인덱스와 실제 DOM 인덱스를 맞춘다
+// cleanContainer 제외 노드(주석, <script>)를 먼저 지워서 Virtual DOM 인덱스와 실제 DOM 인덱스를 맞춘다 
 cleanContainer(realRoot);
 let currentVdom = containerToVdom(realRoot);
+// containerToVdom:실제 DOM 요소를 읽어서 Virtual DOM(자바스크립트 객체)으로 바꿈
 const history = new StateHistory(currentVdom);
 
-/** 테스트 영역을 주어진 Virtual DOM으로 그리고, 코드 편집 칸도 같은 내용으로 맞춘다 */
+/** 테스트 영역을 주어진 Virtual DOM으로 그리고, 코드 편집 칸도 같은 내용으로 맞춘다 // function 함수이름(매개변수) { ... }: 함수 정의. vdom을 받아서 화면에 그리는 역할*/
 function showInTestArea(vdom) {
   testRoot.replaceChildren(...vdom.children.map((child) => render(child)));
   testCode.value = testRoot.innerHTML;

@@ -134,10 +134,12 @@ export class FunctionComponent {
     this.#runEffects();
   }
 
-  /** 상태 변경 후 다시 렌더링 (P2-07): 새 Virtual DOM 생성 -> Diff -> 바뀐 부분만 Patch */
+  /** 상태 변경 후 다시 렌더링 (P2-07): 새 Virtual DOM 생성 -> Diff -> 바뀐 부분만 Patch 
+  update():클래스 안에 정의된 메서드 앞에 function 키워드가 없는게 클래스 메서드 문법 this: 클래스 안에서 지금 이 컴포넌트 객체 자신을 가리킴(내장키워드) 
+  */
   update() {
-    if (!this.mounted) throw new Error("mount() 전에는 update()할 수 없습니다.");
-    if (this.isRendering) throw new Error("렌더링 중에는 상태를 변경할 수 없습니다.");
+    if (!this.mounted) throw new Error("mount() 전에는 update()할 수 없습니다.")//화면에 처음 생성되어 나타내는 시점;
+    if (this.isRendering) throw new Error("렌더링 중에는 상태를 변경할 수 없습니다.");//사용자가 눈으로 볼수있는 실제 웹화면을 그려내는작업
     const next = this.#renderVdom();
     const changes = diff(this.vdom, next);
     this.rootEl = patch(this.rootEl, changes);
@@ -227,23 +229,50 @@ function depsChanged(prev, next) {
   if (!prev || !next || prev.length !== next.length) return true;
   return next.some((value, i) => !Object.is(value, prev[i]));
 }
-//값 저장과 변경. 변경되면 자동으로 다시 그린다. 같은 값(Object.is)이면 무시
-export function useState(initial) {
+//값 저장과 변경. 변경되면 자동으로 다시 그린다. 같은 값(Object.is)이면 무시    첫 렌더링이면 hook을 만들어 저장 → set이 불리면 새 값 계산 → 같은 값이면 무시 → 렌더링 중이면 에러 → 값 갱신 → batch 중이면 dirty에 등록만, 아니면 바로 component.update()로 다시 그림.  
+
+export function useState(initial){
+//function useState(initial): 상태 훅을 만드는 함수 정의 반환값:[현재상태값, 상태를 바꾸는 함수] 형태의 배열
   const { component, index } = hookContext("useState");
+  // hookContext:지금 렌더링 중인 컴포넌트와 "이 훅이 몇 번째 훅인지"를 알려줌 const { component, index } = ...: 구조 분해 할당 [내장 문법]→ 객체에서 component, index 속성을 꺼내서 같은 이름의 변수로 한 번에 만듦 → const component = 결과.component; const index = 결과.index; 와 같은 뜻
+  // "useState" 문자열은 에러 메시지 등에서 어떤 훅인지 표시하려고 넘기는 것으로 추정
+  // slot:component.hooks 배열의 index번째 칸에 이미 저장된 훅이 있는지 확인"state"는 그 칸이 state 종류가 맞는지 검사하는 용도
+  // 컴포넌트가 다시 렌더링될 때는 이전에 저장해둔 hook이 나오고, 첫 렌더링이면 없음(undefined/null)
   let hook = slot(component, index, "state");
+  // !hook: hook이 없으면 true → "첫 렌더링"일 때만 이 안으로 들어감 두번째 렌더링부터는 건너뛰고 저장된 값을 그대로 재사용 = 상태가 유지되는 원리
   if (!hook) {
     hook = { kind: "state", value: typeof initial === "function" ? initial() : initial };
-    hook.set = (next) => {
+    // 상태를 담을 객체 생성. { kind: 종류표시, value: 현재 상태값 }
+    // typeof initial === "function": [내장 연산자] initial의 자료형을 문자열로 알려줌. 함수면 "function"
+    // 삼항 연산자 조건 ? A : B: 조건이 참이면 A, 거짓이면 B
+    //   → initial이 함수면 initial()을 실행한 결과를 쓰고, 아니면 initial 그대로 씀 (지연 초기화)
+    hook.set = (next) => 
+    //hook.set에 "상태 변경 함수"를 만들어 붙임. hook 객체에 속성을 새로 추가하는 것
+    // (next) => { ... }: 화살표 함수. next는 새 값이거나, 이전 값을 받아 새 값을 돌려주는 함수
+    {  // next가 함수면 next(이전값)을 실행한 결과를, 아니면 next 그대로를 새 값으로 씀
+      // 예: setCount(c => c + 1) 처럼 이전 값 기반으로 갱신하는 패턴 지원
       const value = typeof next === "function" ? next(hook.value) : next;
+      // 값이 그대로면 return으로 함수를 끝냄 → 불필요한 재렌더링 방지
       if (Object.is(value, hook.value)) return;
+       // Object.is(a, b): [내장] 두 값이 "같은 값"인지 비교 (===와 거의 같지만 NaN, +0/-0 처리가 다름)
+      // 값이 그대로면 return으로 함수를 끝냄 → 불필요한 재렌더링 방지
       if (component.isRendering) throw new Error("렌더링 중에는 setState를 호출할 수 없습니다.");
+      // 새 값으로 상태 갱신. 이 줄이 실제로 상태를 바꾸는 부분
       hook.value = value;
+      // batchDepth: [직접 만듦] batch(묶음 처리) 안에 있는지 나타내는 숫자 (바깥 파일/모듈 변수)
+      //0보다 크면 지금 batch 실행 중이라는 뜻 (중첩될 수 있어서 true/false가 아니라 숫자로 추정)
+      // dirty: [직접 만듦] "다시 그려야 하는 컴포넌트" 모음. Set 자료구조로 추정
+        // .add(): [내장 - Set 메서드] 값을 추가. Set은 중복을 자동으로 걸러주기 때문에
+        //   같은 컴포넌트가 여러 번 들어와도 한 번만 기록됨
       if (batchDepth > 0) {
         dirty.add(component); // batch 안: 값만 바꾸고 렌더링은 batch가 끝날 때 한 번
         return;
-      }
+      } // batch 밖이면 즉시 컴포넌트를 다시 그림
+      // component.update(): [직접 만듦] 렌더링 → diff → patch를 수행하는 메서드로 추정
       component.update(); // 상태가 바뀌면 자동으로 다시 그린다 (P2-11)
     };
+    // 완성된 hook을 컴포넌트의 hooks 배열 index번째 칸에 저장
+    // 다음 렌더링 때 slot(...)이 이 칸을 읽어서 같은 hook을 돌려줌
     component.hooks[index] = hook;
   }
   return [hook.value, hook.set];
