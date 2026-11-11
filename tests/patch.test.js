@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diff } from "../src/diff.js";
-import { patch } from "../src/patch.js";
-import { vdomToDom } from "../src/render.js";
+import { diff } from "../src/engine/diff.js";
+import { patch } from "../src/engine/patch.js";
+import { vdomToDom } from "../src/engine/render.js";
 
 function withNodeMethods(node) {
   node.remove = function remove() {

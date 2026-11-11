@@ -7,8 +7,8 @@ test("README가 실행 방법과 핵심 모듈을 설명한다", async () => {
 
   assert.match(readme, /node --run dev/);
   assert.match(readme, /node --run test/);
-  assert.match(readme, /src\/diff\.js/);
-  assert.match(readme, /src\/component\.js/);
+  assert.match(readme, /src\/engine\/diff\.js/);
+  assert.match(readme, /src\/engine\/component\.js/);
   assert.match(readme, /useState/);
   assert.match(readme, /useEffect/);
   assert.match(readme, /useMemo/);

@@ -1,10 +1,10 @@
-import { domContainerToVdom } from "./vdom.js";
-import { FunctionComponent, useEffect, useMemo, useState } from "./component.js";
-import { diff } from "./diff.js";
+import { domContainerToVdom } from "../engine/vdom.js";
+import { FunctionComponent, useEffect, useMemo, useState } from "../engine/component.js";
+import { diff } from "../engine/diff.js";
 import { createHistory } from "./history.js";
-import { patch } from "./patch.js";
+import { patch } from "../engine/patch.js";
 import { summarizePatches } from "./patch-summary.js";
-import { vdomToDom } from "./render.js";
+import { vdomToDom } from "../engine/render.js";
 import { filterTodos, syncTodoTitle, toggleTodo } from "./todos.js";
 
 export const phase = 11;

@@ -45,13 +45,15 @@ State와 Hook은 각 앱의 루트 컴포넌트가 관리합니다. 자식 컴�
 
 ## 코드 구조와 테스트
 
+`src/engine/`은 Mini React 엔진입니다. `src/labs/`와 `src/logistics/`는 각각 실습과 물류 시뮬레이터를 구성하고, 화면 갱신에 공통 엔진을 사용합니다.
+
 | 역할 | 주요 파일 |
 | --- | --- |
-| DOM과 Virtual DOM 변환 | `src/vdom.js`, `src/render.js` |
-| 변경 계산과 적용 | `src/diff.js`, `src/patch.js` |
-| 함수형 컴포넌트와 Hooks | `src/component.js` |
-| 실습과 상태 이력 | `src/main.js`, `src/history.js`, `src/todos.js`, `src/patch-summary.js` |
-| 물류 화면과 이동 계산 | `logistics.html`, `src/logistics.js` |
+| DOM과 Virtual DOM 변환 | `src/engine/vdom.js`, `src/engine/render.js` |
+| 변경 계산과 적용 | `src/engine/diff.js`, `src/engine/patch.js` |
+| 함수형 컴포넌트와 Hooks | `src/engine/component.js` |
+| 실습과 상태 이력 | `src/labs/main.js`, `src/labs/history.js`, `src/labs/todos.js`, `src/labs/patch-summary.js` |
+| 물류 화면과 이동 계산 | `logistics.html`, `src/logistics/logistics.js` |
 | 개발 서버 | `scripts/dev-server.js` |
 
 ```powershell

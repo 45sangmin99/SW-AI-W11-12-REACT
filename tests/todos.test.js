@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { filterTodos, syncTodoTitle, toggleTodo } from "../src/todos.js";
+import { filterTodos, syncTodoTitle, toggleTodo } from "../src/labs/todos.js";
 
 const todos = [
   { id: "a", title: "A", completed: false },

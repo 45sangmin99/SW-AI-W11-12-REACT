@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createHistory } from "../src/history.js";
+import { createHistory } from "../src/labs/history.js";
 
 function state(value) {
   return { type: "p", props: {}, children: [value] };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diff } from "../src/diff.js";
+import { diff } from "../src/engine/diff.js";
 
 function h(type, props = {}, children = []) {
   return { type, props, children };

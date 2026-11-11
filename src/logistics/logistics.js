@@ -1,4 +1,4 @@
-import { FunctionComponent, useEffect, useMemo, useState } from "./component.js";
+import { FunctionComponent, useEffect, useMemo, useState } from "../engine/component.js";
 
 const origin = "출발 허브";
 const sharedLeg = { to: "분류 허브", distanceKm: 3.2 };

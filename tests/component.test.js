@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FunctionComponent, useEffect, useMemo, useState } from "../src/component.js";
-import { LogisticsSimulator } from "../src/logistics.js";
+import { FunctionComponent, useEffect, useMemo, useState } from "../src/engine/component.js";
+import { LogisticsSimulator } from "../src/logistics/logistics.js";
 
 function withNodeMethods(node) {
   node.remove = function remove() {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { summarizeComponentUpdate, summarizePatches } from "../src/patch-summary.js";
+import { summarizeComponentUpdate, summarizePatches } from "../src/labs/patch-summary.js";
 
 test("변경이 없으면 실제 영역이 유지됐다고 설명한다", () => {
   assert.equal(

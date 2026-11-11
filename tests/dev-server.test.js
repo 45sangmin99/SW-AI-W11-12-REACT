@@ -18,15 +18,15 @@ after(async () => {
 
 test("개선 Phase R5의 행동과 내부 동작 설명을 제공한다", async () => {
   const page = await fetch(`${baseUrl}/`);
-  const componentModule = await fetch(`${baseUrl}/src/component.js`);
-  const diffModule = await fetch(`${baseUrl}/src/diff.js`);
-  const historyModule = await fetch(`${baseUrl}/src/history.js`);
-  const module = await fetch(`${baseUrl}/src/main.js`);
-  const patchModule = await fetch(`${baseUrl}/src/patch.js`);
-  const patchSummaryModule = await fetch(`${baseUrl}/src/patch-summary.js`);
-  const renderModule = await fetch(`${baseUrl}/src/render.js`);
-  const todosModule = await fetch(`${baseUrl}/src/todos.js`);
-  const vdomModule = await fetch(`${baseUrl}/src/vdom.js`);
+  const componentModule = await fetch(`${baseUrl}/src/engine/component.js`);
+  const diffModule = await fetch(`${baseUrl}/src/engine/diff.js`);
+  const historyModule = await fetch(`${baseUrl}/src/labs/history.js`);
+  const module = await fetch(`${baseUrl}/src/labs/main.js`);
+  const patchModule = await fetch(`${baseUrl}/src/engine/patch.js`);
+  const patchSummaryModule = await fetch(`${baseUrl}/src/labs/patch-summary.js`);
+  const renderModule = await fetch(`${baseUrl}/src/engine/render.js`);
+  const todosModule = await fetch(`${baseUrl}/src/labs/todos.js`);
+  const vdomModule = await fetch(`${baseUrl}/src/engine/vdom.js`);
 
   assert.equal(page.status, 200);
   const html = await page.text();
@@ -62,14 +62,14 @@ test("개선 Phase R5의 행동과 내부 동작 설명을 제공한다", async 
 
 test("물류 시뮬레이터 페이지가 실습으로 돌아가는 링크와 렌더링 모듈을 제공한다", async () => {
   const page = await fetch(`${baseUrl}/logistics.html`);
-  const routeModule = await fetch(`${baseUrl}/src/logistics.js`);
+  const routeModule = await fetch(`${baseUrl}/src/logistics/logistics.js`);
 
   assert.equal(page.status, 200);
   assert.equal(routeModule.status, 200);
   assert.match(routeModule.headers.get("content-type"), /javascript/);
   const html = await page.text();
   assert.match(html, /href="\/">← Mini React 실습으로 돌아가기/);
-  assert.match(html, /type="module" src="\/src\/logistics\.js"/);
+  assert.match(html, /type="module" src="\/src\/logistics\/logistics\.js"/);
 });
 
 test("삭제된 공지 편집기 경로는 404를 반환한다", async () => {

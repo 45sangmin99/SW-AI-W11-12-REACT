@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { vdomToDom } from "../src/render.js";
+import { vdomToDom } from "../src/engine/render.js";
 
 function createDocument() {
   return {
