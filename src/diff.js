@@ -39,10 +39,13 @@ function keyedChildren(children) {
 function compareKeyedChildren(oldChildren, newChildren, path, patches) {
   const oldKeyed = keyedChildren(oldChildren);
   const newKeyed = keyedChildren(newChildren);
+  const order = [];
 
   for (const [key, { index }] of oldKeyed) {
     if (!newKeyed.has(key)) {
       patches.push({ type: "REMOVE", path: [...path, index], key });
+    } else {
+      order.push(oldKeyed.get(key));
     }
   }
 
@@ -51,10 +54,13 @@ function compareKeyedChildren(oldChildren, newChildren, path, patches) {
 
     if (!previous) {
       patches.push({ type: "CREATE", path: [...path, index], node: child, key });
+      order.splice(index, 0, undefined);
       continue;
     }
 
-    if (previous.index !== index) {
+    if (order[index] !== previous) {
+      order.splice(order.indexOf(previous, index + 1), 1);
+      order.splice(index, 0, previous);
       patches.push({ type: "MOVE", path, key, to: index });
     }
 

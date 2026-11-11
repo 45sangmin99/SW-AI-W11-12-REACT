@@ -58,7 +58,7 @@ test("같은 타입의 자식과 텍스트를 위치에 따라 재귀 비교한�
   ]);
 });
 
-test("key로 삭제·이동·생성과 같은 항목의 변경을 찾는다", () => {
+test("key 삭제로 제자리에 온 항목은 이동 없이 수정한다", () => {
   const oldTree = h("ul", {}, [
     h("li", { key: "a" }, ["A"]),
     h("li", { key: "b" }, ["B"]),
@@ -70,7 +70,6 @@ test("key로 삭제·이동·생성과 같은 항목의 변경을 찾는다", ()
 
   assert.deepEqual(diff(oldTree, newTree), [
     { type: "REMOVE", path: [0], key: "a" },
-    { type: "MOVE", path: [], key: "b", to: 0 },
     { type: "UPDATE_TEXT", path: [0, 0], value: "B!" },
     { type: "CREATE", path: [1], node: newTree.children[1], key: "c" },
   ]);

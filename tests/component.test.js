@@ -214,7 +214,7 @@ test("도착 순서를 바꿔도 펼친 차량 상세를 그대로 옮긴다", (
   const structuralPatches = component.lastPatches.filter(({ type }) => type !== "UPDATE_PROPS");
   assert.deepEqual(structuralPatches, [
     { type: "MOVE", path: [4, 2, 2], key: "T-03", to: 0 },
-    { type: "MOVE", path: [4, 2, 2], key: "T-01", to: 2 },
+    { type: "MOVE", path: [4, 2, 2], key: "T-02", to: 1 },
   ]);
 
   select.onchange({ target: { value: "fastest" } });

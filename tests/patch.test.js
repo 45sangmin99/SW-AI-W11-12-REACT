@@ -158,6 +158,20 @@ test("여러 key 이동 후에도 원하는 순서와 노드 정체성을 유지
   assert.deepEqual(updatedRoot.childNodes, [nodes.c, nodes.a, nodes.b]);
 });
 
+test("key 재정렬 중 최종 인덱스가 같은 항목도 올바른 위치와 내용을 유지한다", () => {
+  const documentRef = createDocument();
+  const item = (key, label = key) => h("li", { key }, [label]);
+  const oldTree = h("ul", {}, [item("a"), item("b"), item("c"), item("d")]);
+  const newTree = h("ul", {}, [item("d"), item("b", "B!"), item("c"), item("a")]);
+  const root = vdomToDom(oldTree, documentRef);
+  const [a, b, c, d] = root.childNodes;
+
+  const updated = patch(root, diff(oldTree, newTree), documentRef);
+
+  assert.deepEqual(toVdom(updated), newTree);
+  [d, b, c, a].forEach((node, index) => assert.equal(updated.childNodes[index], node));
+});
+
 test("루트 교체·삭제·생성 결과를 반환한다", () => {
   const documentRef = createDocument();
   const container = documentRef.createElement("main");
