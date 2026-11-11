@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mini React - 단위 테스트</title>
+    <style>
+      :root { --bg: #f6f7f9; --text: #1f2430; --pass: #1a7f37; --fail: #cf222e; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #14161b; --text: #e6e8ee; --pass: #3fb950; --fail: #ff7b72; }
+      }
+      body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 14px/1.6 ui-monospace, Menlo, monospace; }
+      h1 { font-size: 16px; }
+      h2 { font-size: 14px; margin: 20px 0 4px; }
+      ul { margin: 0; padding-left: 0; list-style: none; }
+      li { padding: 1px 0; overflow-wrap: anywhere; }
+      .pass { color: var(--pass); }
+      .fail { color: var(--fail); font-weight: bold; }
+      #summary { font-size: 15px; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <h1>Mini React 단위 테스트</h1>
+    <div id="output">실행 중…</div>
+
+    <script type="module">
+      import { runAll } from "./tests/runner.js";
+      import "./tests/vdom.test.js";
+      import "./tests/diff-patch.test.js";
+      import "./tests/history.test.js";
+      import "./tests/hooks.test.js";
+      import "./tests/core-batch-handlers.test.js";
+      import "./tests/voc-analysis.test.js";
+      import "./tests/voc-ui.test.js";
+      import "./tests/dom-mutations.test.js";
+      runAll(document.getElementById("output"));
+    </script>
+  </body>
+</html>
