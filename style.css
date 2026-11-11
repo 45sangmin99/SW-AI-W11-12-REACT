@@ -406,55 +406,151 @@ pre {
   color: #29384e;
 }
 
-.concept-note {
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  border-left: 3px solid #315b9d;
-  color: #29384e;
-  background: #eef3f9;
-}
-
-.hook-notes {
+.component-workspace,
+.component-code-grid {
   display: grid;
-  gap: 0.4rem;
-  margin: 0 0 1rem;
-  padding-left: 1.25rem;
-  color: #556273;
+  gap: 1rem;
 }
 
-.render-flow {
+.component-workspace {
+  grid-template-columns: minmax(0, 29fr) minmax(0, 71fr);
+}
+
+.component-explanation {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.component-code-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.component-code-grid > section {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d8e0ea;
+  border-radius: 0.45rem;
+  background: #f4f7fb;
+}
+
+.component-code-grid h4 {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  background: #e7edf7;
+}
+
+.component-code-grid pre {
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: transparent;
+}
+
+.component-code-grid .pane-help {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid #d8e0ea;
+}
+
+.component-run {
+  padding: 0;
+  overflow: hidden;
+}
+
+.component-run-header {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-bottom: 1rem;
-  color: #435168;
-  font-size: 0.9rem;
-  font-weight: 700;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  background: #2459a6;
 }
 
-.render-flow span:not(:last-child)::after {
-  margin-left: 0.35rem;
-  color: #8a95a4;
-  content: "→";
-}
-
-.component-feedback {
-  margin-top: 1rem;
-  padding: 0.85rem 1rem;
-  border-left: 3px solid #315b9d;
-  background: #eef3f9;
-}
-
-.component-feedback p {
-  margin-bottom: 0;
+.component-run-header h3,
+.component-run-header p {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 #component-summary {
-  color: #29384e;
+  font-size: 0.9rem;
 }
 
-.effect-status {
-  margin: 0.75rem 0 0;
+.component-run-steps {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.75rem;
+  list-style: none;
+}
+
+.component-run-steps > li {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(0, 3fr);
+  overflow: hidden;
+  border: 1px solid #d8e0ea;
+  border-radius: 0.4rem;
+  background: #f7f9fc;
+}
+
+.component-run-steps h4,
+.component-run-steps p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.component-run-steps > li > h4 {
+  padding: 0.65rem 0.75rem;
+  background: #eaf0f8;
+}
+
+.component-run-steps > li > div {
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+#component-state,
+#component-memo,
+#effect-output {
+  font-size: 0.9rem;
+  color: #31527d;
+}
+
+.component-run-steps p + p {
+  margin-top: 0.35rem;
+}
+
+.component-run-steps details {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 56rem) {
+  .component-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 36rem) {
+  .component-code-grid,
+  .component-run-steps > li {
+    grid-template-columns: 1fr;
+  }
+}
+
+#component-lab .todo-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+#component-lab .todo-filters button,
+#component-lab .todo-item button {
+  padding-inline: 0.4rem;
+  font-size: 0.875rem;
 }
 
 .todo-app h3 {
@@ -539,6 +635,18 @@ pre {
   border-top: 1px solid #dce1e7;
 }
 
+.todo-item > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-item > button {
+  flex: none;
+  white-space: nowrap;
+}
+
 .todo-item.is-completed span {
   color: #778394;
   text-decoration: line-through;
@@ -601,8 +709,5 @@ pre {
     grid-template-columns: 1fr;
   }
 
-  .todo-item {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+
 }

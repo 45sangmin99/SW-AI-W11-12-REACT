@@ -33,13 +33,15 @@ test("개선 Phase R5의 행동과 내부 동작 설명을 제공한다", async 
   assert.match(html, /Virtual DOM 변경 실험/);
   assert.match(html, /Component · State · Hooks/);
   assert.match(html, /Virtual DOM 실습 순서/);
-  assert.match(html, /Component와 Hook 실습 순서/);
-  assert.match(html, /루트 TodoApp만 State를 소유/);
-  assert.match(html, /useMemo.*todos나 filter가 바뀔 때만/);
-  assert.match(html, /useEffect.*문서 제목에 반영/);
-  assert.match(html, /State 변경.*Component 재실행.*Virtual DOM Diff.*실제 DOM Patch/);
-  assert.match(html, /최근 사용자 행동과 내부 결과/);
+  assert.match(html, /완료 동작을 작성하는 두 방법/);
+  assert.match(html, /DOM 직접 갱신 예시/);
+  assert.match(html, /FunctionComponent\.hooks/);
+  assert.match(html, /id="component-state"/);
+  assert.match(html, /id="component-memo"/);
+  assert.match(html, /id="effect-output"/);
+  assert.match(html, /실제 Patch 명령 보기/);
   assert.match(html, /아직 할 일 앱을 조작하지 않았습니다/);
+
   assert.doesNotMatch(html, /현재 카운터/);
   assert.match(html, /<details class="internals">/);
   assert.match(html, /최근 결과/);

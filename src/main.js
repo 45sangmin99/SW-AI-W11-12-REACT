@@ -3,7 +3,7 @@ import { FunctionComponent, useEffect, useMemo, useState } from "./component.js"
 import { diff } from "./diff.js";
 import { createHistory } from "./history.js";
 import { patch } from "./patch.js";
-import { summarizeComponentUpdate, summarizePatches } from "./patch-summary.js";
+import { summarizePatches } from "./patch-summary.js";
 import { vdomToDom } from "./render.js";
 import { filterTodos, syncTodoTitle, toggleTodo } from "./todos.js";
 
@@ -231,24 +231,22 @@ function TodoSummary({ todos }) {
   };
 }
 
-function MemoStatus({ calculations }) {
-  return {
-    type: "p",
-    props: { class: "memo-status", "data-child": "memo-status" },
-    children: [`useMemo 필터 계산 ${calculations}회`],
-  };
-}
+
 
 function TodoItem({ todo, onToggle }) {
   return {
     type: "li",
     props: { key: todo.id, class: todo.completed ? "todo-item is-completed" : "todo-item" },
     children: [
-      { type: "span", props: {}, children: [todo.title] },
+      { type: "span", props: { title: todo.title }, children: [todo.title] },
       {
         type: "button",
-        props: { type: "button", onClick: () => onToggle(todo.id) },
-        children: [todo.completed ? "진행 중으로 변경" : "완료로 변경"],
+        props: {
+          type: "button",
+          "aria-label": todo.completed ? `${todo.title} 완료 취소` : `${todo.title} 완료`,
+          onClick: () => onToggle(todo.id),
+        },
+        children: [todo.completed ? "완료 취소" : "완료"],
       },
     ],
   };
@@ -271,6 +269,71 @@ const initialTodos = [
 ];
 let nextTodoId = 1;
 let memoRuns = 0;
+let effectRuns = 0;
+let todoView;
+
+function describeStateChange(before, after, todoId) {
+  const changes = [];
+  if (before.draft !== after.draft) {
+    changes.push(`draft: ${JSON.stringify(before.draft)} → ${JSON.stringify(after.draft)}`);
+  }
+  if (before.filter !== after.filter) {
+    changes.push(`filter: ${before.filter} → ${after.filter}`);
+  }
+  if (before.todos.length !== after.todos.length) {
+    changes.push(`todos.length: ${before.todos.length} → ${after.todos.length}`);
+  }
+  if (todoId !== undefined) {
+    const previous = before.todos.find(({ id }) => id === todoId);
+    const current = after.todos.find(({ id }) => id === todoId);
+    changes.push(`${current.title} · completed: ${previous.completed} → ${current.completed}`);
+  }
+  return changes.join(" · ") || "상태 변경 없음";
+}
+
+function updateTodos(message, actions, todoId) {
+  const before = todoView;
+  const previousMemoRuns = memoRuns;
+  const previousEffectRuns = effectRuns;
+  const renders = [];
+  for (const action of actions) {
+    const previousPatches = todoComponent.lastPatches;
+    action();
+    if (todoComponent.lastPatches !== previousPatches) {
+      renders.push(todoComponent.lastPatches);
+    }
+  }
+
+  const after = todoView;
+  const previousCompleted = before.todos.filter(({ completed }) => completed).length;
+  const currentCompleted = after.todos.filter(({ completed }) => completed).length;
+  const outcomes = [];
+  if (before.visibleTodos.length !== after.visibleTodos.length) {
+    outcomes.push(`표시 항목 ${before.visibleTodos.length} → ${after.visibleTodos.length}`);
+  }
+  if (previousCompleted !== currentCompleted) {
+    outcomes.push(`완료 건수 ${previousCompleted} → ${currentCompleted}`);
+  }
+  const patches = renders.flat();
+  outcomes.push(summarizePatches(patches));
+
+  componentSummary.textContent = message;
+  componentState.textContent = describeStateChange(before, after, todoId);
+  componentRender.textContent = `update() → TodoApp 재실행 ${renders.length}회`;
+  componentMemo.textContent = memoRuns > previousMemoRuns
+    ? `useMemo · 필터 결과 재계산 ${memoRuns - previousMemoRuns}회`
+    : renders.length ? "useMemo · 기존 필터 결과 재사용" : "useMemo · 렌더링 생략";
+  componentPatch.textContent = outcomes.join(" · ");
+  effectOutput.textContent = effectRuns > previousEffectRuns
+    ? `useEffect · 실행 ${effectRuns - previousEffectRuns}회 · 문서 제목: ${document.title}`
+    : renders.length ? "useEffect · 실행 생략 · 할 일 개수가 같습니다." : "useEffect · 렌더링 생략";
+  componentDiffOutput.textContent = JSON.stringify(
+    renders,
+    (_name, value) => typeof value === "function" ? "[Function]" : value,
+    2,
+  );
+  document.querySelector("#app-status").textContent = `실습 2: ${message}`;
+}
 
 function TodoApp() {
   const [todos, setTodos] = useState(initialTodos);
@@ -280,45 +343,22 @@ function TodoApp() {
     memoRuns += 1;
     return filterTodos(todos, filter);
   }, [todos, filter]);
+  todoView = { todos, filter, draft, visibleTodos };
   useEffect(() => {
-    effectOutput.textContent =
-      `useEffect: 문서 제목을 할 일 ${todos.length}개와 동기화했습니다.`;
+    effectRuns += 1;
     return syncTodoTitle(document, todos.length);
   }, [todos.length]);
-
-  const update = (message, stateName, ...actions) => {
-    const renders = [];
-    for (const action of actions) {
-      const previousPatches = todoComponent.lastPatches;
-      action();
-      if (todoComponent.lastPatches !== previousPatches) {
-        renders.push(todoComponent.lastPatches);
-      }
-    }
-    componentDiffOutput.textContent = JSON.stringify(
-      renders,
-      (_name, value) => typeof value === "function" ? "[Function]" : value,
-      2,
-    );
-    componentSummary.textContent = summarizeComponentUpdate(
-      message, stateName, renders.flat(), renders.length,
-    );
-    document.querySelector("#app-status").textContent =
-      `실습 2: ${message}`;
-  };
 
   return {
     type: "section",
     props: { class: "component-card todo-app", "data-component": "TodoApp" },
     children: [
-      { type: "h3", props: {}, children: ["할 일 관리"] },
+      { type: "h3", props: {}, children: ["할 일 앱"] },
       TodoForm({
         draft,
-        onDraftChange: (event) => update(
-          "입력값 변경",
-          "draft",
+        onDraftChange: (event) => updateTodos("입력값 변경", [
           () => setDraft(event.target.value),
-        ),
+        ]),
         onSubmit: (event) => {
           event.preventDefault();
           const title = draft.trim();
@@ -326,31 +366,27 @@ function TodoApp() {
             document.querySelector("#app-status").textContent = "실습 2: 할 일을 입력하세요.";
             return;
           }
-          update(
-            `‘${title}’ 할 일 추가`,
-            "draft·todos",
+          const todo = { id: `todo-${nextTodoId++}`, title, completed: false };
+          updateTodos(`‘${title}’ 할 일 추가`, [
             () => setDraft(""),
-            () => setTodos([...todos, { id: `todo-${nextTodoId++}`, title, completed: false }]),
-          );
+            () => setTodos([...todos, todo]),
+          ]);
         },
       }),
       TodoFilter({
         filter,
-        onChange: (nextFilter) => update(
-          "필터 변경",
-          "filter",
-          () => setFilter(nextFilter),
-        ),
+        onChange: (nextFilter) => updateTodos("필터 변경", [() => setFilter(nextFilter)]),
       }),
       TodoSummary({ todos }),
-      MemoStatus({ calculations: memoRuns }),
       TodoList({
         todos: visibleTodos,
-        onToggle: (id) => update(
-          "완료 상태 변경",
-          "todos",
-          () => setTodos(toggleTodo(todos, id)),
-        ),
+        onToggle: (id) => {
+          const todo = todos.find((item) => item.id === id);
+          const action = todo.completed ? "진행 중으로 변경" : "완료";
+          updateTodos(`‘${todo.title}’ ${action}`, [
+            () => setTodos(toggleTodo(todos, id)),
+          ], id);
+        },
       }),
     ],
   };
@@ -359,6 +395,10 @@ function TodoApp() {
 const componentOutput = document.querySelector("#component-output");
 const componentDiffOutput = document.querySelector("#component-diff-output");
 const componentSummary = document.querySelector("#component-summary");
+const componentState = document.querySelector("#component-state");
+const componentRender = document.querySelector("#component-render");
+const componentMemo = document.querySelector("#component-memo");
+const componentPatch = document.querySelector("#component-patch");
 const effectOutput = document.querySelector("#effect-output");
 const todoComponent = new FunctionComponent(
   TodoApp,
