@@ -41,16 +41,32 @@ Mini React는 이 구조에서 상태를 보관하고 컴포넌트를 다시 실
 
 - `useState`는 렌더링 사이에 상태를 보관하고, 값이 바뀌면 화면 갱신을 요청합니다.
 - `useEffect`는 DOM 반영 후 문서 제목 갱신이나 타이머 설정·정리 같은 작업을 수행합니다.
-- `useMemo`는 의존성이 같을 때 할 일 필터나 배송 현황 같은 계산 결과를 재사용합니다.
+- `useMemo`는 두 번째 인자인 배열에 담긴 값을 이전 렌더링과 비교해, 모두 같으면 이전 계산 결과를 재사용하고 하나라도 달라지면 다시 계산합니다.
 
 ## 코드 구조와 테스트
 
-| 역할 | 주요 파일 | 대표 검증 |
-| --- | --- | --- |
-| DOM과 Virtual DOM 변환 | `src/engine/vdom.js`, `src/engine/render.js` | 공백 텍스트 보존, 요소 생성, 이벤트 연결 |
-| 변경 계산과 적용 | `src/engine/diff.js`, `src/engine/patch.js` | 재정렬과 내용 수정이 동시에 일어날 때 올바른 노드 갱신 |
-| 컴포넌트와 Hooks | `src/engine/component.js` | 동일한 상태값의 렌더링 생략, effect 이후 갱신 |
-| 실습과 상태 이력 | `src/labs/main.js`, `src/labs/history.js`, `src/labs/patch-summary.js` | 이전 상태 복원, 실제 Patch 결과 표시 |
+### 코드 구조
+
+| 역할 | 주요 파일 |
+| --- | --- |
+| DOM과 Virtual DOM 변환·렌더링 | `src/engine/vdom.js`, `src/engine/render.js` |
+| 변경 계산과 적용 | `src/engine/diff.js`, `src/engine/patch.js` |
+| 함수형 컴포넌트와 Hooks | `src/engine/component.js` |
+| 실습과 상태 이력 | `src/labs/main.js`, `src/labs/history.js`, `src/labs/todos.js`, `src/labs/patch-summary.js` |
+| 물류 시뮬레이터 | `src/logistics/logistics.js` |
+
+### 엔진 테스트
+
+| 검증 범위 | 개수 | 주요 검증 내용 |
+| --- | ---: | --- |
+| Virtual DOM 변환 | 6 | DOM 구조와 자식 순서를 유지하고, 공백만 있는 텍스트도 보존합니다. |
+| 렌더링 | 4 | Virtual DOM에서 요소와 텍스트를 만들고, 함수형 이벤트 속성을 DOM 핸들러에 연결합니다. |
+| Diff | 8 | 두 트리에서 생성·삭제·교체·속성·텍스트 변경 명령을 계산하고, `key`가 있는 목록의 변경을 처리합니다. |
+| Patch | 9 | 변경 명령을 적용한 결과가 목표 트리와 일치하는지 확인합니다. 재정렬과 내용 변경이 겹칠 때 기존 DOM 객체가 재사용되는지도 검증합니다. |
+| 컴포넌트와 Hooks | 17 | 상태 변경이 Diff·Patch를 시작하는지, 같은 값이면 렌더링을 생략하는지, effect 실행·정리 순서와 메모 재사용이 맞는지 확인합니다. |
+| **합계** | **44** | **Mini React 엔진을 직접 검증하는 테스트** |
+
+전체 저장소의 자동 테스트는 아래 명령으로 실행합니다.
 
 ```powershell
 node --run test
