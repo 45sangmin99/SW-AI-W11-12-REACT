@@ -58,7 +58,18 @@ State와 Hook은 각 앱의 루트 컴포넌트가 관리합니다. 자식 컴�
 node --run test
 ```
 
-테스트는 Virtual DOM 변환, Diff·Patch, Hooks, 상태 이력과 함께 차량별 이동 거리, 최종 도착, 한 단계 이전으로의 복원, 영향 없는 DOM 노드의 재사용을 검증합니다. 배차 목록을 재정렬할 때 차량 행과 펼친 상세 요소가 재사용되는지도 확인합니다.
+| 테스트 파일 | 주요 검증 내용 |
+| --- | --- |
+| [vdom.test.js](tests/vdom.test.js) | 실제 DOM의 태그·속성·텍스트·자식을 Virtual DOM으로 변환하고 원본을 보존합니다. |
+| [render.test.js](tests/render.test.js) | Virtual DOM에서 실제 요소와 텍스트를 만들고 속성과 이벤트 핸들러를 연결합니다. |
+| [diff.test.js](tests/diff.test.js) | 두 트리에서 생성·삭제·교체·속성 및 텍스트 변경을 찾고, `key`가 있는 목록의 이동을 계산합니다. |
+| [patch.test.js](tests/patch.test.js) | 변경 명령을 실제 DOM에 적용하고, 목록을 재정렬할 때 기존 노드가 재사용되는지 확인합니다. |
+| [component.test.js](tests/component.test.js) | 컴포넌트의 최초 렌더링과 상태 변경 후 갱신, `useState`·`useEffect`·`useMemo`의 동작을 확인합니다. 차량별 이동과 도착, 이전 단계 복원, 타이머 정리, 정렬 후 펼친 차량 상세 유지도 검증합니다. |
+| [history.test.js](tests/history.test.js) | 스냅샷 저장과 이전·다음 이동, 과거 상태에서 새 변경을 추가할 때 이후 이력이 정리되는지 확인합니다. |
+| [patch-summary.test.js](tests/patch-summary.test.js) | Patch 종류별 개수와 DOM 재사용·교체 결과를 사람이 읽을 수 있는 문구로 변환하는지 확인합니다. |
+| [todos.test.js](tests/todos.test.js) | 할 일 필터링과 완료 상태 전환, 문서 제목 갱신과 복원을 확인합니다. |
+| [dev-server.test.js](tests/dev-server.test.js) | 실습 안내와 물류 페이지의 이동 링크·렌더링 모듈이 제공되고, 미등록 경로가 404를 반환하는지 확인합니다. |
+| [readme.test.js](tests/readme.test.js) | README에 실행 방법과 핵심 모듈 설명이 있는지 확인합니다. |
 
 ## 실제 React와의 차이
 
