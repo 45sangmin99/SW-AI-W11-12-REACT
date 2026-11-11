@@ -435,7 +435,60 @@ describe("진행 상태 (F-08, R-14) — Step 1 임시 버전", () => {
       eq($$(".status-steps button").length, 5);
       eq($(".status-steps .current").textContent, "확인 필요");
       assert(text($(".status-history")).includes("변경 이력이 없습니다"));
-      eq($$(".alert-status").length, 0, "기본 상태인 카드에는 상태를 적지 않는다");
+      // 모든 카드에 상태가 적힌다 (이력이 없는 신호는 '확인 필요')
+      eq($$(".alert-status").length, $$(".alert-card").length);
+      assert($$(".alert-status").every((s) => s.textContent === "상태 · 확인 필요"));
+      assert($$(".alert-card").every((b) => b.classList.contains("st-0")), "처음엔 모두 첫 단계 색");
+    });
+  });
+
+  it("단계마다 카드의 색 클래스가 바뀐다 (확인 필요 st-0 → 분석 중 st-1 → … → 해결 st-4)", async () => {
+    await withStatusApp((ctx) => {
+      const { $$ } = ctx;
+      ["확인 필요", "분석 중", "유관부서 전달", "조치 중", "해결"].forEach((label, i) => {
+        click(stepBtn(ctx, label));
+        assert($$(".alert-card")[0].classList.contains(`st-${i}`), `${label} → st-${i}`);
+        eq($$(".alert-card")[0].className.match(/st-\d/g).length, 1, "색 클래스는 하나만 붙는다");
+        assert($$(".status-steps .current")[0].classList.contains(`st-${i}`), "패널의 현재 단계 버튼도 같은 색");
+      });
+      assert($$(".alert-card")[1].classList.contains("st-0"), "다른 카드는 그대로");
+    });
+  });
+
+  it("진행 현황 필터로 같은 상태의 신호만 모아 볼 수 있다 (탐지 계산·요약은 그대로)", async () => {
+    await withStatusApp((ctx) => {
+      const { $, $$ } = ctx;
+      const total = $$(".alert-card").length;
+      const summary = text($(".summary"));
+      click(stepBtn(ctx, "분석 중")); // 첫 카드 → 분석 중
+      click($$(".alert-card")[1]);
+      click(stepBtn(ctx, "해결")); // 둘째 카드 → 해결
+
+      choose($("select[name=statusFilter]"), "분석 중");
+      eq($$(".alert-card").length, 1);
+      assert(text($$(".alert-card")[0]).includes("상태 · 분석 중"));
+      choose($("select[name=statusFilter]"), "해결");
+      eq($$(".alert-card").length, 1);
+      choose($("select[name=statusFilter]"), "확인 필요");
+      eq($$(".alert-card").length, total - 2, "이력이 없는 신호는 '확인 필요'로 모인다");
+      eq(text($(".summary")), summary, "요약은 진행 현황 필터의 영향을 받지 않는다");
+      choose($("select[name=statusFilter]"), "all");
+      eq($$(".alert-card").length, total);
+    });
+  });
+
+  it("해당 상태의 신호가 없으면 빈 상태가 보이고, 초기화하면 진행 현황 필터도 돌아온다", async () => {
+    await withStatusApp((ctx) => {
+      const { $, $$ } = ctx;
+      const total = $$(".alert-card").length;
+      choose($("select[name=statusFilter]"), "조치 중");
+      eq($$(".alert-card").length, 0);
+      assert(text($(".signal-list")).includes("감지된 이상 신호가 없습니다"));
+      assert(!$(".progress"), "선택할 신호가 없으면 진행 현황도 없다");
+      click([...$$("button")].find((b) => b.textContent === "초기화"));
+      eq($("select[name=statusFilter]").value, "all");
+      eq($$(".alert-card").length, total);
+      assert($(".progress"));
     });
   });
 
@@ -477,13 +530,14 @@ describe("진행 상태 (F-08, R-14) — Step 1 임시 버전", () => {
     });
   });
 
-  it("상태를 바꾸면 그 신호 카드에만 상태가 적히고, 다른 신호의 상태와 섞이지 않는다", async () => {
+  it("상태를 바꾸면 그 신호 카드의 상태만 바뀌고, 다른 신호의 상태와 섞이지 않는다", async () => {
     await withStatusApp((ctx) => {
       const { $$ } = ctx;
       const first = $$(".alert-card")[0];
       click(stepBtn(ctx, "분석 중"));
-      eq($$(".alert-status").length, 1);
+      eq($$(".alert-status").filter((s) => s.textContent === "상태 · 분석 중").length, 1);
       assert(text($$(".alert-card")[0]).includes("상태 · 분석 중"));
+      assert(text($$(".alert-card")[1]).includes("상태 · 확인 필요"));
       click($$(".alert-card")[1]);
       eq($$(".status-steps .current")[0].textContent, "확인 필요", "다른 신호는 자기 상태를 가진다");
       eq(histRows(ctx).length, 0);

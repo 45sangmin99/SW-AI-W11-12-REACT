@@ -11,6 +11,9 @@ import { pageWindow } from "./pagination.js";
 
 const STATUS_TEXT = { loading: "불러오는 중", empty: "표시할 내용이 없습니다", error: "문제가 발생했습니다" };
 
+/** 진행 상태 단계 번호(0~4)로 색 클래스를 만든다: 카드의 왼쪽 막대와 패널의 단계 버튼이 같은 색을 쓴다 */
+const stClass = (s) => `st-${Math.max(0, STATUSES.indexOf(s))}`;
+
 // 선 아이콘은 라이브러리 없이 인라인 SVG로 그린다 (16px, 선 1.5, 글자색을 따름)
 const icon = (...paths) =>
   h(
@@ -50,7 +53,7 @@ export function Header({ isGenerated }) {
 const field = (label, control) => h("label", { class: "field" }, h("span", null, label), control);
 const allOption = (text) => h("option", { value: "all" }, text);
 
-export function FilterBar({ query, period, category, device, appVersion, appVersions, onQuery, onPeriod, onCategory, onDevice, onVersion, onReset }) {
+export function FilterBar({ query, period, category, device, appVersion, appVersions, statusFilter, onQuery, onPeriod, onCategory, onDevice, onVersion, onStatusFilter, onReset }) {
   return h(
     "section",
     { class: "filter-bar", "aria-label": "필터" },
@@ -59,6 +62,8 @@ export function FilterBar({ query, period, category, device, appVersion, appVers
     field("유형", h("select", { name: "category", value: category, onChange: (e) => onCategory(e.target.value) }, allOption("전체 유형"), CONFIG.CATEGORIES.map((c) => h("option", { value: c }, c)))),
     field("기기", h("select", { name: "device", value: device, onChange: (e) => onDevice(e.target.value) }, allOption("전체 기기"), CONFIG.DEVICES.map((d) => h("option", { value: d }, d)))),
     field("앱 버전", h("select", { name: "appVersion", value: appVersion, onChange: (e) => onVersion(e.target.value) }, allOption("전체 버전"), appVersions.map((v) => h("option", { value: v }, v)))),
+    // 진행 현황 필터: 탐지가 끝난 신호를 상태별로 모아 본다 (탐지 계산에는 영향을 주지 않는다)
+    field("진행 현황", h("select", { name: "statusFilter", value: statusFilter, onChange: (e) => onStatusFilter(e.target.value) }, allOption("전체 상태"), STATUSES.map((s) => h("option", { value: s }, s)))),
     h("button", { type: "button", class: "btn btn-ghost", onClick: onReset }, "초기화"),
   );
 }
@@ -77,7 +82,7 @@ export function SummaryCard({ summary, status, message }) {
 }
 
 // ---------------------------------------------------------------- ④ SignalList (R-02, F-04): 가로 카드
-// statusOf: { 신호 ID: 현재 상태 }. 기본 상태("확인 필요")가 아닌 신호만 카드에 상태를 적는다
+// statusOf: { 신호 ID: 현재 상태 }. 이력이 없는 신호는 기본 상태("확인 필요")로 보고, 모든 카드에 상태를 적는다
 export function SignalList({ alerts, selectedId, onSelect, statusOf = {}, status, message }) {
   let body;
   if (status !== "ready") body = h(StatusView, { status, message });
@@ -86,15 +91,16 @@ export function SignalList({ alerts, selectedId, onSelect, statusOf = {}, status
     body = h(
       "ul",
       { class: "alert-cards" },
-      alerts.map((a) =>
-        h(
+      alerts.map((a) => {
+        const st = statusOf[a.id] ?? DEFAULT_STATUS;
+        return h(
           "li",
           null,
           h(
             "button",
             {
               type: "button",
-              class: a.id === selectedId ? "alert-card selected" : "alert-card",
+              class: `${a.id === selectedId ? "alert-card selected" : "alert-card"} ${stClass(st)}`,
               "aria-pressed": a.id === selectedId ? "true" : "false",
               onClick: () => onSelect(a.id),
             },
@@ -106,10 +112,10 @@ export function SignalList({ alerts, selectedId, onSelect, statusOf = {}, status
               h(Severity, { level: a.severity }),
             ),
             h("span", { class: "alert-meta" }, h("span", { class: "alert-metric" }, a.metricLabel), h("span", { class: "alert-time" }, formatRangeShort(a.startHour, a.endHour))),
-            statusOf[a.id] && statusOf[a.id] !== DEFAULT_STATUS ? h("span", { class: "alert-status" }, `상태 · ${statusOf[a.id]}`) : null,
+            h("span", { class: "alert-status" }, `상태 · ${st}`),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
   return h("section", { class: "panel signal-list", "aria-label": "이상 신호 목록" }, h("h2", null, "이상 신호"), body);
@@ -235,7 +241,7 @@ export function ProgressPanel({ alertId, currentStatus: current, history, onStat
       STATUSES.map((s) =>
         h(
           "button",
-          { type: "button", class: s === current ? "btn step current" : "btn step", "aria-pressed": s === current ? "true" : "false", disabled: s !== current && !canChangeTo(current, s), onClick: () => onStatusChange(alertId, s) },
+          { type: "button", class: `${s === current ? "btn step current" : "btn step"} ${stClass(s)}`, "aria-pressed": s === current ? "true" : "false", disabled: s !== current && !canChangeTo(current, s), onClick: () => onStatusChange(alertId, s) },
           s,
         ),
       ),

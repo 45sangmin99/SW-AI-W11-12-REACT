@@ -17,6 +17,7 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
   const [category, setCategory] = useState("all");
   const [device, setDevice] = useState("all");
   const [appVersion, setAppVersion] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all"); // 진행 현황 필터: 탐지가 끝난 신호를 상태별로 모아 본다 (F-08)
   // ---- 선택·페이지 (R-02, F-02)
   const [selectedId, setSelectedId] = useState(null);
   const [page, setPage] = useState(1);
@@ -58,7 +59,11 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
     [scoped, range, category, device, appVersion],
   );
   const since = sinceHour(period, range ? range.to : null);
-  const visibleAlerts = useMemo(() => (since === null ? alerts : alerts.filter((a) => a.endHour >= since)), [alerts, since]);
+  // 기간 필터와 진행 현황 필터는 둘 다 탐지가 끝난 뒤에 적용한다 (탐지 계산이나 "평소" 이력에는 영향이 없다)
+  const visibleAlerts = useMemo(
+    () => alerts.filter((a) => (since === null || a.endHour >= since) && (statusFilter === "all" || currentStatus(statusLog[a.id]) === statusFilter)),
+    [alerts, since, statusFilter, statusLog],
+  );
   const summary = useMemo(() => summarize(scoped.filter((q) => inPeriod(q.created_at, since))), [scoped, since]);
   // 선택한 발생 건이 필터로 사라졌으면 첫 발생 건으로 대신한다 (아무것도 선택되지 않은 빈 화면을 피함)
   const selected = visibleAlerts.find((a) => a.id === selectedId) ?? visibleAlerts[0] ?? null;
@@ -80,6 +85,7 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
     setCategory("all");
     setDevice("all");
     setAppVersion("all");
+    setStatusFilter("all");
     setPage(1);
   };
   const onSelect = (id) => {
@@ -97,9 +103,9 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
     { class: "app" },
     h(Header, { isGenerated: meta.generated === true }),
     h(FilterBar, {
-      query, period, category, device, appVersion, appVersions,
+      query, period, category, device, appVersion, appVersions, statusFilter,
       onQuery: changeFilter(setQuery), onPeriod: changeFilter(setPeriod), onCategory: changeFilter(setCategory),
-      onDevice: changeFilter(setDevice), onVersion: changeFilter(setAppVersion), onReset,
+      onDevice: changeFilter(setDevice), onVersion: changeFilter(setAppVersion), onStatusFilter: changeFilter(setStatusFilter), onReset,
     }),
     h(SummaryCard, { summary, ...statusProps }),
     h(SignalList, { alerts: visibleAlerts, selectedId: selected ? selected.id : null, onSelect, statusOf, ...statusProps }),
