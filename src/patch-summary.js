@@ -24,10 +24,11 @@ export function summarizePatches(patches) {
   return `${changes.join(" · ")} · 총 ${patches.length}개 변경`;
 }
 
-export function summarizeComponentUpdate(action, stateName, patches) {
+export function summarizeComponentUpdate(action, stateName, patches, renderCount = 1) {
+  if (renderCount === 0) return `${action} · State 변경 없음 · Component 재실행 0회`;
   const rootReplaced = patches.some(
     ({ type, path = [] }) => type === "REPLACE" && path.length === 0,
   );
   const domResult = rootReplaced ? "루트 DOM 교체" : "루트 DOM 재사용";
-  return `${action} · ${stateName} State 변경 · Component 재실행 · ${summarizePatches(patches)} · ${domResult}`;
+  return `${action} · ${stateName} State 변경 · Component 재실행 ${renderCount}회 · ${summarizePatches(patches)} · ${domResult}`;
 }

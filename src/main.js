@@ -200,11 +200,23 @@ function TodoApp() {
     return syncTodoTitle(document, todos.length);
   }, [todos.length]);
 
-  const update = (action, message, stateName) => {
-    action();
-    const patches = todoComponent.lastPatches;
-    componentDiffOutput.textContent = JSON.stringify(patches, null, 2);
-    componentSummary.textContent = summarizeComponentUpdate(message, stateName, patches);
+  const update = (message, stateName, ...actions) => {
+    const renders = [];
+    for (const action of actions) {
+      const previousPatches = todoComponent.lastPatches;
+      action();
+      if (todoComponent.lastPatches !== previousPatches) {
+        renders.push(todoComponent.lastPatches);
+      }
+    }
+    componentDiffOutput.textContent = JSON.stringify(
+      renders,
+      (_name, value) => typeof value === "function" ? "[Function]" : value,
+      2,
+    );
+    componentSummary.textContent = summarizeComponentUpdate(
+      message, stateName, renders.flat(), renders.length,
+    );
     document.querySelector("#app-status").textContent =
       `실습 2: ${message}`;
   };
@@ -217,9 +229,9 @@ function TodoApp() {
       TodoForm({
         draft,
         onDraftChange: (event) => update(
-          () => setDraft(event.target.value),
           "입력값 변경",
           "draft",
+          () => setDraft(event.target.value),
         ),
         onSubmit: (event) => {
           event.preventDefault();
@@ -228,18 +240,20 @@ function TodoApp() {
             document.querySelector("#app-status").textContent = "실습 2: 할 일을 입력하세요.";
             return;
           }
-          update(() => {
-            setDraft("");
-            setTodos([...todos, { id: `todo-${nextTodoId++}`, title, completed: false }]);
-          }, `‘${title}’ 할 일 추가`, "draft·todos");
+          update(
+            `‘${title}’ 할 일 추가`,
+            "draft·todos",
+            () => setDraft(""),
+            () => setTodos([...todos, { id: `todo-${nextTodoId++}`, title, completed: false }]),
+          );
         },
       }),
       TodoFilter({
         filter,
         onChange: (nextFilter) => update(
-          () => setFilter(nextFilter),
           "필터 변경",
           "filter",
+          () => setFilter(nextFilter),
         ),
       }),
       TodoSummary({ todos }),
@@ -247,9 +261,9 @@ function TodoApp() {
       TodoList({
         todos: visibleTodos,
         onToggle: (id) => update(
-          () => setTodos(toggleTodo(todos, id)),
           "완료 상태 변경",
           "todos",
+          () => setTodos(toggleTodo(todos, id)),
         ),
       }),
     ],

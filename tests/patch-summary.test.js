@@ -39,7 +39,7 @@ test("사용자 행동부터 State와 Component, Patch, DOM 재사용까지 연�
       "todos",
       [{ type: "UPDATE_TEXT", path: [2, 0] }],
     ),
-    "완료 상태 변경 · todos State 변경 · Component 재실행 · 텍스트 수정 1개 · 총 1개 변경 · 루트 DOM 재사용",
+    "완료 상태 변경 · todos State 변경 · Component 재실행 1회 · 텍스트 수정 1개 · 총 1개 변경 · 루트 DOM 재사용",
   );
 });
 
@@ -47,5 +47,12 @@ test("루트 REPLACE는 DOM 교체로 설명한다", () => {
   assert.match(
     summarizeComponentUpdate("화면 변경", "view", [{ type: "REPLACE", path: [] }]),
     /루트 DOM 교체$/,
+  );
+});
+
+test("렌더가 없으면 상태 변경이나 Patch를 보고하지 않는다", () => {
+  assert.equal(
+    summarizeComponentUpdate("필터 변경", "filter", [], 0),
+    "필터 변경 · State 변경 없음 · Component 재실행 0회",
   );
 });
