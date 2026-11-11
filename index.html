@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>미니 React</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: sans-serif; color: #222; }
+      #status { margin: 0; padding: 12px 16px; color: #b42318; background: #fff1f0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+      #app { display: grid; grid-template-columns: 1fr 1fr; height: 100vh; min-height: 600px; }
+      section { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+      .preview { border-left: 1px solid #ddd; }
+      h2 { margin: 0; padding: 12px 16px; font-size: 14px; background: #f7f7f7; border-bottom: 1px solid #ddd; }
+      .editor-toolbar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: #f7f7f7; border-bottom: 1px solid #ddd; }
+      .editor-toolbar h2 { padding: 0; border: 0; margin-right: auto; }
+      .editor-toolbar button { padding: 5px 12px; cursor: pointer; }
+      .editor-toolbar label { display: flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
+      .preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #f7f7f7; border-bottom: 1px solid #ddd; }
+      .preview-toolbar h2 { padding: 0; border: 0; }
+      .preview-toolbar label { display: flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
+      textarea { flex: 1; width: 100%; min-height: 0; padding: 16px; border: 0; resize: none; font: 14px/1.6 monospace; tab-size: 2; }
+      textarea:focus-visible { outline: 2px solid #555; outline-offset: -2px; }
+      iframe { flex: 1; width: 100%; border: 0; }
+      @media (max-width: 700px) {
+        #app { grid-template-columns: 1fr; height: auto; }
+        .editor { height: 700px; }
+        .preview { min-height: 400px; border-left: 0; border-top: 1px solid #ddd; }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <section class="editor" aria-labelledby="code-title">
+        <div class="editor-toolbar">
+          <h2 id="code-title">코드</h2>
+          <label><input id="auto-apply" type="checkbox" checked> 자동 반영</label>
+          <button id="patch" type="button" disabled>Patch</button>
+          <button id="history-back" type="button" disabled title="Ctrl/⌘+Z (코드 편집창 밖)">뒤로가기</button>
+          <button id="history-forward" type="button" disabled title="Ctrl/⌘+Shift+Z (코드 편집창 밖)">앞으로가기</button>
+          <span id="history-position" role="status" aria-label="VDOM 이력">0 / 0</span>
+        </div>
+        <textarea id="editor" aria-labelledby="code-title" spellcheck="false"></textarea>
+      </section>
+      <section class="preview" aria-labelledby="preview-title">
+        <div class="preview-toolbar">
+          <h2 id="preview-title">미리보기</h2>
+          <label title="노랑: DOM 경계 · 초록: 최근 5개 브라우저 프레임의 Patch 변경"><input id="dom-debug" type="checkbox"> DOM 갱신 표시</label>
+        </div>
+        <p id="status" role="alert" hidden></p>
+        <iframe id="preview" title="실행 결과" sandbox="allow-scripts"></iframe>
+      </section>
+    </main>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
