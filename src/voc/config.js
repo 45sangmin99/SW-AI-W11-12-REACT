@@ -38,6 +38,9 @@ export const CONFIG = Object.freeze({
   REPEAT_MEDIUM: 20,
   REPEAT_HIGH: 40,
 
+  // ---- 진행 상태 (정의서 F-08, C10): 신호 발생 건마다 이 다섯 단계 중 하나. 첫 값이 기본 상태다
+  STATUSES: Object.freeze(["확인 필요", "분석 중", "유관부서 전달", "조치 중", "해결"]),
+
   // ---- 화면 (U-23)
   PAGE_SIZE: 5, // 근거 문의 한 페이지의 건수
   CHART_PAD_BEFORE: 36, // 급증·반복 차트에서 발생 구간 앞뒤로 함께 보여줄 시간

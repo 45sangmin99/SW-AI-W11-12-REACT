@@ -5,10 +5,12 @@ import { CONFIG } from "./config.js";
 import { hourRange, filterInquiries, detectAlerts, sinceHour, inPeriod, summarize } from "./analysis.js";
 import { paginate } from "./pagination.js";
 import { loadDataset, appVersionsOf } from "./data.js";
-import { Header, FilterBar, SummaryCard, SignalList, SignalDetail } from "./components.js";
+import { Header, FilterBar, SummaryCard, SignalList, SignalDetail, ProgressPanel } from "./components.js";
+import { currentStatus, appendStatus } from "./status.js";
 
-// props: dataUrl(데이터 위치), load(불러오기 함수). load는 테스트에서 바꿔 끼우기 위한 것이고, 기본값이 실제 동작이다
-export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset } = {}) {
+// props: dataUrl(데이터 위치), load(불러오기 함수), now(상태를 바꾼 시각을 만드는 함수).
+// load와 now는 테스트에서 바꿔 끼우기 위한 것이고, 기본값이 실제 동작이다
+export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset, now = () => new Date().toISOString() } = {}) {
   // ---- 필터 (R-03, F-07)
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState("all");
@@ -22,6 +24,8 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
   const [inquiries, setInquiries] = useState([]);
   const [meta, setMeta] = useState({});
   const [loadState, setLoadState] = useState({ status: "loading", message: "" });
+  // ---- 신호 진행 상태 이력 (F-08, R-14, Step 1 임시 버전): { 신호 ID: [{ status, at }, ...] }. 이력은 새 행만 추가한다
+  const [statusLog, setStatusLog] = useState({});
 
   // 문의 데이터 불러오기 (Step 1은 공용 샘플 JSON, Step 4에서 문의 서비스 API로 교체)
   useEffect(() => {
@@ -60,6 +64,8 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
   const selected = visibleAlerts.find((a) => a.id === selectedId) ?? visibleAlerts[0] ?? null;
   const evidence = useMemo(() => paginate(selected ? selected.evidence : [], page, CONFIG.PAGE_SIZE), [selected, page]);
   const appVersions = useMemo(() => appVersionsOf(inquiries), [inquiries]);
+  // 카드에 보여줄 현재 상태: 이력이 바뀔 때만 다시 만든다
+  const statusOf = useMemo(() => Object.fromEntries(Object.entries(statusLog).map(([id, history]) => [id, currentStatus(history)])), [statusLog]);
 
   const statusProps = { status: loadState.status, message: loadState.status === "error" ? loadState.message : "" };
 
@@ -80,6 +86,11 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
     setSelectedId(id);
     setPage(1);
   };
+  // 같은 상태로의 변경은 이력에 행을 만들지 않는다 (U-06과 같은 이유: 바뀐 게 없으면 기록하지 않는다)
+  const onStatusChange = (alertId, status) => {
+    if (status === currentStatus(statusLog[alertId])) return;
+    setStatusLog((log) => ({ ...log, [alertId]: appendStatus(log[alertId], status, now()) }));
+  };
 
   return h(
     "div",
@@ -91,8 +102,11 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
       onDevice: changeFilter(setDevice), onVersion: changeFilter(setAppVersion), onReset,
     }),
     h(SummaryCard, { summary, ...statusProps }),
-    h(SignalList, { alerts: visibleAlerts, selectedId: selected ? selected.id : null, onSelect, ...statusProps }),
+    h(SignalList, { alerts: visibleAlerts, selectedId: selected ? selected.id : null, onSelect, statusOf, ...statusProps }),
     h(SignalDetail, { alert: selected, evidence, onPageChange: setPage, ...statusProps }),
+    loadState.status === "ready" && selected
+      ? h(ProgressPanel, { alertId: selected.id, currentStatus: currentStatus(statusLog[selected.id]), history: statusLog[selected.id] ?? [], onStatusChange })
+      : null,
     loadState.status === "ready" && loadState.message ? h("p", { class: "notice" }, loadState.message) : null,
   );
 }

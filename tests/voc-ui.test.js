@@ -19,12 +19,12 @@ const loadSample = () => (samplePromise ??= fetch("./data/inquiries.sample.json"
 const expectedAlertCount = (data) => detectAlerts(data.inquiries, hourRange(data.inquiries)).length;
 
 /** 앱을 띄우고 데이터가 들어올 때까지 기다린 뒤 fn({ c, box, $, $$, data })을 실행한다 */
-async function withApp(fn, { dataset } = {}) {
+async function withApp(fn, { dataset, props } = {}) {
   const box = document.createElement("div");
   sandbox.appendChild(box);
   try {
     const data = dataset ?? parseDataset(await loadSample());
-    const c = mountApp(box, { load: () => Promise.resolve(data) });
+    const c = mountApp(box, { load: () => Promise.resolve(data), ...props });
     await tick(0);
     await fn({ c, box, data, $: (s) => box.querySelector(s), $$: (s) => [...box.querySelectorAll(s)] });
   } finally {
@@ -416,6 +416,92 @@ describe("근거 문의 · 페이지 나누기 · 반복 문구 강조 (R-05, F-
       assert(/iOS|Android|Web/.test(meta), `기기: ${meta}`);
       assert(/\d+\.\d+\.\d+|web/.test(meta), `앱 버전: ${meta}`);
       assert(/2026-11-09 \d\d:\d\d/.test(meta), `시각: ${meta}`);
+    });
+  });
+});
+
+describe("진행 상태 (F-08, R-14) — Step 1 임시 버전", () => {
+  const T = "2026-11-10T12:34:56.000Z";
+  const stepBtn = ({ $$ }, label) => $$(".status-steps button").find((b) => b.textContent === label);
+  const histRows = ({ $$ }) => $$(".status-history li:not(.muted)").map((li) => li.querySelector(".hist-status").textContent);
+  const withStatusApp = (fn) => withApp(fn, { props: { now: () => T } });
+
+  it("신호를 고르면 진행 현황이 그 신호 기준으로 보이고, 처음엔 '확인 필요'에 이력이 없다", async () => {
+    await withStatusApp((ctx) => {
+      const { $, $$, data } = ctx;
+      assert($(".progress"), "진행 현황 패널");
+      // 처음에는 첫 신호가 선택되어 있고, 패널은 그 신호의 ID를 가리킨다 (기대값은 분석 함수로 따로 계산)
+      eq($(".progress").getAttribute("data-alert"), detectAlerts(data.inquiries, hourRange(data.inquiries))[0].id);
+      eq($$(".status-steps button").length, 5);
+      eq($(".status-steps .current").textContent, "확인 필요");
+      assert(text($(".status-history")).includes("변경 이력이 없습니다"));
+      eq($$(".alert-status").length, 0, "기본 상태인 카드에는 상태를 적지 않는다");
+    });
+  });
+
+  it("상태를 바꿀 때마다 이력에 새 행이 붙고 이전 행은 그대로다 (R-14: 이전 행을 수정하지 않는다)", async () => {
+    await withStatusApp((ctx) => {
+      const { $, $$ } = ctx;
+      click(stepBtn(ctx, "분석 중"));
+      deepEq(histRows(ctx), ["분석 중"]);
+      const firstRowHtml = $$(".status-history li")[0].outerHTML;
+      click(stepBtn(ctx, "조치 중"));
+      deepEq(histRows(ctx), ["조치 중", "분석 중"], "최신이 위");
+      eq($$(".status-history li")[1].outerHTML, firstRowHtml, "이전 행은 그대로");
+      eq($(".status-steps .current").textContent, "조치 중", "현재 상태 = 가장 마지막 행");
+      assert(text($(".status-history")).includes("11-10 12:34 UTC"), "바뀐 시각이 이력에 보인다");
+    });
+  });
+
+  it("현재와 같은 상태를 누르면 이력에 행이 생기지 않는다", async () => {
+    await withStatusApp((ctx) => {
+      click(stepBtn(ctx, "분석 중"));
+      click(stepBtn(ctx, "분석 중"));
+      click(stepBtn(ctx, "확인 필요")); // 기본 상태로 되돌리는 것은 정책에 따라 막힐 수 있다 — 어느 쪽이든 같은 상태 반복은 행을 늘리지 않는다
+      assert(histRows(ctx).filter((s) => s === "분석 중").length === 1);
+    });
+  });
+
+  it("상태를 바꾸면 그 신호 카드에만 상태가 적히고, 다른 신호의 상태와 섞이지 않는다", async () => {
+    await withStatusApp((ctx) => {
+      const { $$ } = ctx;
+      const first = $$(".alert-card")[0];
+      click(stepBtn(ctx, "분석 중"));
+      eq($$(".alert-status").length, 1);
+      assert(text($$(".alert-card")[0]).includes("상태 · 분석 중"));
+      click($$(".alert-card")[1]);
+      eq($$(".status-steps .current")[0].textContent, "확인 필요", "다른 신호는 자기 상태를 가진다");
+      eq(histRows(ctx).length, 0);
+      click($$(".alert-card")[0]);
+      eq($$(".status-steps .current")[0].textContent, "분석 중", "돌아오면 그대로");
+      assert($$(".alert-card")[0] === first, "카드 DOM 노드는 교체되지 않았다");
+    });
+  });
+
+  it("상태 변경은 관련 영역(카드의 상태 줄, 진행 현황)만 고치고 머리글·필터·요약·상세는 건드리지 않는다", async () => {
+    await withStatusApp((ctx) => {
+      const { $, c } = ctx;
+      const snap = snapshot($, [".app-header", ".filter-bar", ".summary", ".signal-detail"]);
+      click(stepBtn(ctx, "유관부서 전달"));
+      assertUntouched($, snap);
+      const touched = new Set(c.lastChanges.filter((x) => x.type !== "REBIND").map((x) => x.path[0]));
+      for (const idx of [0, 1, 2, 4]) assert(!touched.has(idx), `자식 ${idx}번은 건드리지 않았다`);
+    });
+  });
+
+  it("필터를 바꿔도 같은 신호면 같은 ID라서 상태가 이어진다 (U-28: ID = 유형·범위·시작 시각)", async () => {
+    await withStatusApp((ctx) => {
+      const { $, $$ } = ctx;
+      const target = card(ctx, "문의 급증", "배송");
+      click(target);
+      click(stepBtn(ctx, "분석 중"));
+      choose($("select[name=category]"), "배송");
+      const same = card(ctx, "문의 급증", "배송");
+      assert(same, "필터 뒤에도 같은 신호가 있다");
+      assert(text(same).includes("상태 · 분석 중"), "상태가 이어진다");
+      choose($("select[name=category]"), "all");
+      assert(text(card(ctx, "문의 급증", "배송")).includes("상태 · 분석 중"));
+      assert($$(".alert-status").length >= 1);
     });
   });
 });

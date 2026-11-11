@@ -145,17 +145,18 @@ describe("MutationObserver: 문의 이상 탐지 페이지 — 관련 없는 영
     });
   });
 
-  it("신호 선택: 목록의 강조와 상세 영역만 바뀌고 머리글·필터·요약은 건드리지 않는다", async () => {
+  it("신호 선택: 목록의 강조·상세 영역·진행 현황만 바뀌고 머리글·필터·요약은 건드리지 않는다", async () => {
     await withApp(({ box, $, $$ }) => {
       const untouched = [".app-header", ".filter-bar", ".summary"].map((s) => [s, $(s)]);
       const list = $(".signal-list");
       const detail = $(".signal-detail");
+      const progress = $(".progress"); // 정의서 4.3.2: 신호 선택 시 ④ 선택 강조, ⑤ 상세, ⑥ 진행 현황이 갱신된다
       const watcher = watch(box);
       click($$(".alert-card")[1]);
       const records = watcher.take();
       assert(records.length > 0);
       for (const r of records) {
-        assert(list.contains(r.target) || detail.contains(r.target), "신호 목록이나 상세 영역 안의 변경이어야 한다");
+        assert(list.contains(r.target) || detail.contains(r.target) || progress.contains(r.target), "신호 목록, 상세 영역, 진행 현황 안의 변경이어야 한다");
         for (const [name, el] of untouched) assert(!el.contains(r.target), `${name} 안은 건드리지 않았다`);
       }
     });

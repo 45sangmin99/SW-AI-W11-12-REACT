@@ -1,8 +1,11 @@
 // 고객 문의(VOC) 이상 탐지 화면의 컴포넌트 (요구사항 4.3, 4.3.1)
 // 전부 props만 받는 순수 함수다 (C-03, C-04): 상태·Hook 없음. 이벤트는 App이 내려준 콜백으로 올린다.
-// ⑥ 진행 현황(F-08)과 ⑦ 성능 비교는 Step 4 전용이라 여기에 없다.
+// ⑥ 진행 현황(F-08)은 정의서상 Step 4 전용인데, 시연 흐름(필터 → 신호 선택 → 상태 변경 → 갱신)을 위해
+// Step 1에는 임시 버전(저장 없이 메모리에만 유지)으로 넣었다. props 모양은 정의서 그대로라 Step 4에서 이 파일은 바뀌지 않는다.
+// ⑦ 성능 비교는 Step 4 전용이라 여기에 없다.
 import { h } from "../mini-react.js";
 import { CONFIG } from "./config.js";
+import { STATUSES, DEFAULT_STATUS, canChangeTo } from "./status.js";
 import { SIGNAL_LABEL, SEVERITY_LABEL, formatRangeShort, highlightSegments } from "./analysis.js";
 import { pageWindow } from "./pagination.js";
 
@@ -74,7 +77,8 @@ export function SummaryCard({ summary, status, message }) {
 }
 
 // ---------------------------------------------------------------- ④ SignalList (R-02, F-04): 가로 카드
-export function SignalList({ alerts, selectedId, onSelect, status, message }) {
+// statusOf: { 신호 ID: 현재 상태 }. 기본 상태("확인 필요")가 아닌 신호만 카드에 상태를 적는다
+export function SignalList({ alerts, selectedId, onSelect, statusOf = {}, status, message }) {
   let body;
   if (status !== "ready") body = h(StatusView, { status, message });
   else if (alerts.length === 0) body = h(StatusView, { status: "empty", message: "감지된 이상 신호가 없습니다" });
@@ -102,6 +106,7 @@ export function SignalList({ alerts, selectedId, onSelect, status, message }) {
               h(Severity, { level: a.severity }),
             ),
             h("span", { class: "alert-meta" }, h("span", { class: "alert-metric" }, a.metricLabel), h("span", { class: "alert-time" }, formatRangeShort(a.startHour, a.endHour))),
+            statusOf[a.id] && statusOf[a.id] !== DEFAULT_STATUS ? h("span", { class: "alert-status" }, `상태 · ${statusOf[a.id]}`) : null,
           ),
         ),
       ),
@@ -214,6 +219,35 @@ export function EvidenceList({ alert, evidence, onPageChange }) {
     h("h3", null, `근거 문의 ${evidence.total.toLocaleString("ko-KR")}건`),
     h("ul", { class: "inquiry-list" }, evidence.items.map((inquiry) => h(InquiryItem, { inquiry, phrases: alert.phrases }))),
     evidence.totalPages > 1 ? h(Pager, { page: evidence.page, totalPages: evidence.totalPages, onPageChange }) : null,
+  );
+}
+
+// ---------------------------------------------------------------- ⑥ ProgressPanel (F-08, R-14): 임시 버전
+// props는 정의서 그대로: alertId, currentStatus, history, onStatusChange. 상태는 가지지 않는다 (C-03).
+export function ProgressPanel({ alertId, currentStatus: current, history, onStatusChange }) {
+  return h(
+    "section",
+    { class: "panel progress", "aria-label": "진행 현황", "data-alert": alertId },
+    h("h2", null, "진행 현황"),
+    h(
+      "div",
+      { class: "status-steps", role: "group", "aria-label": "상태 변경" },
+      STATUSES.map((s) =>
+        h(
+          "button",
+          { type: "button", class: s === current ? "btn step current" : "btn step", "aria-pressed": s === current ? "true" : "false", disabled: s !== current && !canChangeTo(current, s), onClick: () => onStatusChange(alertId, s) },
+          s,
+        ),
+      ),
+    ),
+    h(
+      "ul",
+      { class: "status-history", "aria-label": "상태 변경 이력" },
+      history.length === 0
+        ? h("li", { class: "muted" }, "변경 이력이 없습니다")
+        : history.slice().reverse().map((row) => h("li", null, h("span", { class: "hist-status" }, row.status), h("span", { class: "hist-at" }, `${row.at.slice(5, 16).replace("T", " ")} UTC`))),
+    ),
+    h("p", { class: "muted" }, "이 브라우저에만 임시로 저장됩니다. 새로고침하면 사라집니다"),
   );
 }
 
