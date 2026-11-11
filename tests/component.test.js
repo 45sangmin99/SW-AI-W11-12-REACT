@@ -556,6 +556,37 @@ test("의존성 배열을 생략한 useEffect는 매 렌더링 후 실행된다"
   assert.equal(runs, 2);
 });
 
+test("effect의 상태 변경은 현재 effect를 마친 뒤 cleanup과 다음 렌더를 실행한다", () => {
+  const documentRef = createDocument();
+  const container = documentRef.createElement("main");
+  const events = [];
+  const component = new FunctionComponent(() => {
+    const [count, setCount] = useState(0);
+    useEffect(() => {
+      events.push(`effect ${count}`);
+      if (count === 0) setCount(1);
+      return () => {
+        events.push(`cleanup ${count}`);
+        if (count === 0) setCount(2);
+        if (count === 2) setCount(3);
+      };
+    }, [count]);
+    useEffect(() => {
+      events.push(`second ${count}`);
+    }, [count]);
+    return view({ message: String(count) });
+  }, {}, container, documentRef);
+
+  component.mount();
+  assert.equal(component.root.childNodes[1].childNodes[0].nodeValue, "2");
+  component.unmount();
+  assert.deepEqual(events, [
+    "effect 0", "second 0", "cleanup 0",
+    "effect 1", "second 1", "cleanup 1",
+    "effect 2", "second 2", "cleanup 2",
+  ]);
+});
+
 test("useEffect 인자와 호출 위치를 검증한다", () => {
   assert.throws(() => useEffect(() => {}), /while rendering/);
 

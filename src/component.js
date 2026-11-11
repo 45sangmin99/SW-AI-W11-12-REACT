@@ -21,6 +21,7 @@ export function useState(initialValue) {
   if (!(index in component.hooks)) component.hooks[index] = initialValue;
 
   const setState = (nextValue) => {
+    if (!component.mounted) return;
     const previousValue = component.hooks[index];
     const value = typeof nextValue === "function"
       ? nextValue(previousValue)
@@ -100,6 +101,8 @@ export class FunctionComponent {
     this.root = null;
     this.lastPatches = [];
     this.pendingEffects = [];
+    this.runningEffects = false;
+    this.deferredProps = null;
     this.mounted = false;
   }
 
@@ -120,11 +123,18 @@ export class FunctionComponent {
     const pendingEffects = this.pendingEffects;
     this.pendingEffects = [];
 
-    for (const index of pendingEffects) {
-      const hook = this.hooks[index];
-      hook.cleanup?.();
-      const cleanup = hook.effect();
-      hook.cleanup = typeof cleanup === "function" ? cleanup : undefined;
+    this.runningEffects = true;
+    try {
+      for (const index of pendingEffects) {
+        const hook = this.hooks[index];
+        const previousCleanup = hook.cleanup;
+        hook.cleanup = undefined;
+        previousCleanup?.();
+        const cleanup = hook.effect();
+        hook.cleanup = typeof cleanup === "function" ? cleanup : undefined;
+      }
+    } finally {
+      this.runningEffects = false;
     }
   }
 
@@ -138,6 +148,7 @@ export class FunctionComponent {
     this.container.replaceChildren(...(this.root ? [this.root] : []));
     this.mounted = true;
     this.runEffects();
+    if (this.deferredProps) this.update(...this.deferredProps);
     return this.root;
   }
 
@@ -146,32 +157,45 @@ export class FunctionComponent {
       throw new Error("FunctionComponent must be mounted before update().");
     }
 
-    this.props = nextProps;
-    const nextVdom = this.render();
-    const patches = diff(this.vdom, nextVdom);
-
-    this.root = patch(this.root, patches, this.document);
-    if (this.root?.parentNode !== this.container) {
-      this.container.replaceChildren(...(this.root ? [this.root] : []));
+    if (this.runningEffects) {
+      this.deferredProps = [nextProps];
+      return [];
     }
 
-    this.vdom = nextVdom;
-    this.lastPatches = patches;
-    this.runEffects();
-    return patches;
+    do {
+      this.deferredProps = null;
+      this.props = nextProps;
+      const nextVdom = this.render();
+      const patches = diff(this.vdom, nextVdom);
+
+      this.root = patch(this.root, patches, this.document);
+      if (this.root?.parentNode !== this.container) {
+        this.container.replaceChildren(...(this.root ? [this.root] : []));
+      }
+
+      this.vdom = nextVdom;
+      this.lastPatches = patches;
+      this.runEffects();
+      if (this.deferredProps) [nextProps] = this.deferredProps;
+    } while (this.deferredProps);
+    return this.lastPatches;
   }
 
   unmount() {
     if (!this.mounted) return;
-
-    for (const hook of this.hooks) {
-      if (hook?.type === "effect") hook.cleanup?.();
-    }
-    this.root?.remove();
-    this.hooks = [];
-    this.pendingEffects = [];
-    this.vdom = null;
-    this.root = null;
     this.mounted = false;
+
+    try {
+      for (const hook of this.hooks) {
+        if (hook?.type === "effect") hook.cleanup?.();
+      }
+    } finally {
+      this.root?.remove();
+      this.hooks = [];
+      this.pendingEffects = [];
+      this.deferredProps = null;
+      this.vdom = null;
+      this.root = null;
+    }
   }
 }
