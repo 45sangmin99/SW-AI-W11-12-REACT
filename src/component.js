@@ -22,9 +22,12 @@ export function useState(initialValue) {
 
   const setState = (nextValue) => {
     const previousValue = component.hooks[index];
-    component.hooks[index] = typeof nextValue === "function"
+    const value = typeof nextValue === "function"
       ? nextValue(previousValue)
       : nextValue;
+    if (Object.is(previousValue, value)) return;
+
+    component.hooks[index] = value;
     component.update();
   };
 

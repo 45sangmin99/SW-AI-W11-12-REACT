@@ -431,6 +431,30 @@ test("useState setter가 상태 변경 후 자동으로 Diff와 Patch를 실행�
   assert.equal(component.root.childNodes[1].childNodes[0].nodeValue, "New");
 });
 
+test("같은 상태값은 effect 안에서도 추가 렌더링을 일으키지 않는다", () => {
+  const documentRef = createDocument();
+  const container = documentRef.createElement("main");
+  let renders = 0;
+  let setCount;
+  const component = new FunctionComponent(() => {
+    const [count, updateCount] = useState(0);
+    setCount = updateCount;
+    renders += 1;
+    useEffect(() => {
+      if (renders === 1) setCount(0);
+    });
+    return view({ message: String(count) });
+  }, {}, container, documentRef);
+
+  component.mount();
+  assert.equal(renders, 1);
+  setCount((count) => count);
+  assert.equal(renders, 1);
+  setCount((count) => count + 1);
+  assert.equal(renders, 2);
+  assert.equal(component.root.childNodes[1].childNodes[0].nodeValue, "1");
+});
+
 test("useState는 FunctionComponent 렌더링 밖에서 호출할 수 없다", () => {
   assert.throws(() => useState(0), /while rendering/);
 });
