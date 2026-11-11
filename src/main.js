@@ -232,7 +232,6 @@ function TodoApp() {
             setDraft("");
             setTodos([...todos, { id: `todo-${nextTodoId++}`, title, completed: false }]);
           }, `‘${title}’ 할 일 추가`, "draft·todos");
-          event.currentTarget.reset();
         },
       }),
       TodoFilter({
