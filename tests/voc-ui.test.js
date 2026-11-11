@@ -453,6 +453,21 @@ describe("진행 상태 (F-08, R-14) — Step 1 임시 버전", () => {
     });
   });
 
+  it("어느 단계로든 바꿀 수 있고, 잘못 눌러도 이전 단계로 되돌릴 수 있다 (되돌려도 이력은 남는다)", async () => {
+    await withStatusApp((ctx) => {
+      const { $$ } = ctx;
+      // 현재가 '확인 필요'일 때 나머지 네 버튼이 모두 눌릴 수 있다 (건너뛰기 허용)
+      eq($$(".status-steps button:disabled").length, 0);
+      click(stepBtn(ctx, "해결")); // 확인 필요 → 해결 (건너뛰기)
+      deepEq(histRows(ctx), ["해결"]);
+      click(stepBtn(ctx, "분석 중")); // 해결 → 분석 중 (되돌리기)
+      deepEq(histRows(ctx), ["분석 중", "해결"], "되돌려도 이전 기록은 남는다");
+      click(stepBtn(ctx, "확인 필요")); // 처음 상태로도 되돌릴 수 있다
+      eq($$(".status-steps .current")[0].textContent, "확인 필요");
+      eq(histRows(ctx).length, 3);
+    });
+  });
+
   it("현재와 같은 상태를 누르면 이력에 행이 생기지 않는다", async () => {
     await withStatusApp((ctx) => {
       click(stepBtn(ctx, "분석 중"));

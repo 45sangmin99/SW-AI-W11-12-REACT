@@ -29,7 +29,7 @@ python3 -m http.server 8000
 | --- | --- |
 | `http://localhost:8000/voc.html` | **고객 문의 이상 탐지 페이지** (Phase 1·2를 활용한 테스트 페이지) |
 | `http://localhost:8000/index.html` | Phase 1 검증 페이지 (실제 영역 / 테스트 영역 / Patch / 뒤로·앞으로가기) |
-| `http://localhost:8000/test.html` | 단위·기능 테스트 (265개) |
+| `http://localhost:8000/test.html` | 단위·기능 테스트 (266개) |
 
 샘플 데이터(`data/inquiries.sample.json`, 3,000건)는 시드를 고정한 생성 스크립트로 만든다. 같은 시드면 항상 같은 파일이 나온다.
 
@@ -46,7 +46,7 @@ node scripts/generate-sample.cjs --count 5000     # 건수·시드·기준일 �
 | Phase 1 검증 페이지 | 실제 영역 + 테스트 영역 + Patch/뒤로가기/앞으로가기 | `index.html`, `src/main.js` |
 | **Phase 2** | 함수형 컴포넌트 · State · Hooks(`useState` `useEffect` `useMemo`) · **Batching(선택 과제)** | `src/mini-react.js` |
 | **테스트 페이지** | 고객 문의 이상 탐지 (R-01 ~ R-06, F-02 ~ F-07) | `voc.html`, `src/voc/` |
-| 테스트 | 직접 만든 러너 + 265개 (단위 + 기능 + `MutationObserver`) | `test.html`, `tests/` |
+| 테스트 | 직접 만든 러너 + 266개 (단위 + 기능 + `MutationObserver`) | `test.html`, `tests/` |
 
 Phase 2는 Phase 1의 `diff`·`patch`·`render`를 **그대로 재사용**한다. 상태가 바뀌면 새 Virtual DOM 생성 → Diff → 바뀐 부분만 Patch 순서로 처리된다.
 
@@ -365,7 +365,7 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 
 ## 테스트
 
-브라우저에서 `test.html`을 열면 **265개**가 실행된다. 외부 도구 없이 직접 만든 러너(`tests/runner.js`)를 쓴다.
+브라우저에서 `test.html`을 열면 **266개**가 실행된다. 외부 도구 없이 직접 만든 러너(`tests/runner.js`)를 쓴다.
 
 | 파일 | 검증 대상 | 개수 |
 | --- | --- | ---: |
@@ -375,7 +375,7 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 | `hooks.test.js` | `useState` `useEffect` `useMemo`, Hook 규칙, 렌더 실패 복구, `h()` | 48 |
 | `core-batch-handlers.test.js` | 핸들러 안정화(`REBIND`), Batching | 21 |
 | `voc-analysis.test.js` | 시간·필터·기간·요약, **4신호 경계값**, 정규화, 페이지, 데이터 불러오기, **시나리오 정답지** | 79 |
-| `voc-ui.test.js` | 기능 테스트: 실제 입력·클릭으로 부분 갱신, 상태 표시, 차트, 페이지, **진행 상태(임시)** | 34 |
+| `voc-ui.test.js` | 기능 테스트: 실제 입력·클릭으로 부분 갱신, 상태 표시, 차트, 페이지, **진행 상태(임시)** | 35 |
 | `dom-mutations.test.js` | **`MutationObserver`로 실제 DOM 변경 관측** | 10 |
 
 정의서의 경계값을 하나씩 찌른다: 20건(19/20), 3배(평균 7건에서 20/21건), 20%p(65%/70%), 70%(13/20, 14/20), 10건(9/10), 3일 미만 이력, 심각도 경계 등.
@@ -415,7 +415,7 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 | U-21 차트 | 직접 그린 SVG (C-11: 외부 라이브러리 없음) |
 | U-22 심각도 | 급증 배수 3~5/5~10/10 이상 · 쏠림 +20~30/30~40/40%p 이상 · 기기·버전 70~80/80~90/90% 이상 · 반복 10~19/20~39/40건 이상 |
 | U-23 페이지 크기 | 5건 |
-| F-08 진행 상태(Step 1 임시) | 다섯 단계(확인 필요 → 분석 중 → 유관부서 전달 → 조치 중 → 해결). 이력은 새 행만 추가하고 마지막 행이 현재 상태. 같은 상태로의 변경은 기록하지 않는다. 단계 사이를 어떻게 오갈 수 있는지(되돌리기 허용 여부)는 정의서에 없어서 `src/voc/status.js`의 `canChangeTo`로 정한다 |
+| F-08 진행 상태(Step 1 임시) | 다섯 단계(확인 필요 → 분석 중 → 유관부서 전달 → 조치 중 → 해결). 이력은 새 행만 추가하고 마지막 행이 현재 상태. 같은 상태로의 변경은 기록하지 않는다. 단계 사이를 어떻게 오갈 수 있는지는 정의서에 없어서 **어느 단계로든 바꿀 수 있게** 했다(사용자 결정). 잘못 눌러도 복구할 수 있어야 하고, 되돌려도 이력에 새 행으로 남기 때문이다. 규칙은 `src/voc/status.js`의 `canChangeTo` |
 | 기간 필터 값 | 전체 / 최근 24시간 / 최근 3일 / 최근 7일 (데이터의 마지막 시각 기준, UTC) |
 | 샘플 JSON 형식 | `{ meta, inquiries }`. `meta.generated`로 "생성 데이터" 표시, `meta.scenarios`는 시나리오 정답지(화면은 쓰지 않음). Web 기기의 `app_version`은 `"web"` |
 
