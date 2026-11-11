@@ -12,6 +12,13 @@ export const phase = 11;
 const actualOutput = document.querySelector("#actual-output");
 const renderOutput = document.querySelector("#render-output");
 const output = document.querySelector("#vdom-output");
+const previousOutput = document.querySelector("#previous-vdom-output");
+const inspection = document.querySelector("#dom-inspection");
+const example = document.querySelector("#dom-example");
+const exampleHelp = document.querySelector("#dom-example-help");
+const initialHtml = actualOutput.innerHTML;
+const sampleTags = new Set("article aside blockquote br button code dd div dl dt em h1 h2 h3 h4 h5 h6 hr input label li ol p pre section small span strong ul".split(" "));
+const sampleAttributes = new Set("class id key title type disabled checked value for role".split(" "));
 const diffOutput = document.querySelector("#diff-output");
 const backButton = document.querySelector("#back-button");
 const patchButton = document.querySelector("#patch-button");
@@ -22,9 +29,47 @@ let currentVdom = domContainerToVdom(actualOutput);
 const history = createHistory(currentVdom);
 
 function renderTest(vdom) {
-  renderOutput.replaceChildren(
-    ...(vdom?.children ?? []).map((child) => vdomToDom(child, document)),
-  );
+  const container = document.createElement("template");
+  container.content.append(...vdom.children.map((child) => vdomToDom(child, document)));
+  renderOutput.value = container.innerHTML;
+}
+
+function readTestHtml() {
+  const template = document.createElement("template");
+  template.innerHTML = renderOutput.value;
+  for (const element of template.content.querySelectorAll("*")) {
+    if (!sampleTags.has(element.localName)) {
+      throw new Error(`실습에서 사용할 수 없는 태그입니다: <${element.localName}>`);
+    }
+
+    for (const { name } of element.attributes) {
+      if (!sampleAttributes.has(name) && !/^(aria|data)-/.test(name)) {
+        throw new Error(`실습에서 사용할 수 없는 속성입니다: ${name}`);
+      }
+    }
+  }
+
+  const container = document.createElement("div");
+  container.append(template.content);
+  return domContainerToVdom(container);
+}
+
+function showInspection(before, after) {
+  if (before.length > 1 || after.length > 1) {
+    inspection.textContent = "data-inspect를 한 요소에만 붙여 비교하세요.";
+    return;
+  }
+
+  const [previousNode] = before;
+  const [nextNode] = after;
+  if (!previousNode && !nextNode) {
+    inspection.textContent = "비교할 요소 하나에 data-inspect를 붙이세요.";
+    return;
+  }
+
+  const tag = (node) => node ? `<${node.localName}>` : "없음";
+  const disabled = nextNode && "disabled" in nextNode ? ` · after.disabled = ${nextNode.disabled}` : "";
+  inspection.textContent = `[data-inspect] ${tag(previousNode)} → ${tag(nextNode)} · before === after → ${previousNode === nextNode}${disabled}`;
 }
 
 function updateHistoryControls() {
@@ -33,26 +78,67 @@ function updateHistoryControls() {
   historyPosition.textContent = `저장 상태 ${history.position} / ${history.length}`;
 }
 
-function applyVdom(nextVdom) {
-  const patches = diff(currentVdom, nextVdom);
+function applyVdom(nextVdom, patches = diff(currentVdom, nextVdom)) {
+  const before = actualOutput.querySelectorAll("[data-inspect]");
   patch(actualOutput, patches, document);
+  const after = actualOutput.querySelectorAll("[data-inspect]");
 
+  previousOutput.textContent = JSON.stringify(currentVdom, null, 2);
   currentVdom = nextVdom;
   output.textContent = JSON.stringify(currentVdom, null, 2);
   diffOutput.textContent = JSON.stringify(patches, null, 2);
+  showInspection(before, after);
   return patches;
 }
 
 renderTest(currentVdom);
+previousOutput.textContent = "아직 비교하지 않았습니다.";
 output.textContent = JSON.stringify(currentVdom, null, 2);
 diffOutput.textContent = "[]";
 updateHistoryControls();
 document.querySelector("#app-status").textContent =
   "두 실습 준비 완료";
 
+function sampleHtml(edit) {
+  const template = document.createElement("template");
+  template.innerHTML = initialHtml;
+  edit(template.content.querySelector("[data-inspect]"));
+  return template.innerHTML;
+}
+
+const examples = {
+  initial: [initialHtml, "초기 HTML을 불러왔습니다. Patch를 적용하면 실제 영역에 반영됩니다."],
+  props: [sampleHtml((button) => button.removeAttribute("disabled")), "disabled를 지우면 기존 버튼이 유지될까요?"],
+  text: [sampleHtml((button) => { button.textContent = "Patch 완료"; }), "글자만 바꾸면 기존 버튼이 유지될까요?"],
+  replace: [
+    sampleHtml((button) => {
+      const span = document.createElement("span");
+      span.setAttribute("data-inspect", "");
+      span.textContent = button.textContent;
+      button.replaceWith(span);
+    }),
+    "button을 span으로 바꾸면 기존 DOM 객체가 유지될까요?",
+  ],
+};
+
+example.addEventListener("change", () => {
+  const selected = examples[example.value];
+  if (selected) [renderOutput.value, exampleHelp.textContent] = selected;
+  example.value = "";
+});
+
 patchButton.addEventListener("click", () => {
-  const nextVdom = domContainerToVdom(renderOutput);
-  const patches = applyVdom(nextVdom);
+  let nextVdom;
+  let changes;
+  try {
+    nextVdom = readTestHtml();
+    changes = diff(currentVdom, nextVdom);
+  } catch (error) {
+    patchSummary.textContent = `입력을 적용할 수 없습니다. ${error.message}`;
+    return;
+  }
+  const patches = applyVdom(nextVdom, changes);
+
 
   if (patches.length) {
     history.push(nextVdom);

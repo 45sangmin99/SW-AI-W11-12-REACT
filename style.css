@@ -323,13 +323,30 @@ pre {
   margin: 0;
 }
 
-.editable {
-  outline: none;
+.html-input {
+  display: block;
+  width: 100%;
+  min-height: 10rem;
+  padding: 0.75rem;
+  border: 1px solid #cfd6df;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: inherit;
+  font: 0.9rem/1.55 ui-monospace, monospace;
+  resize: vertical;
 }
 
-.editable:focus {
-  border-color: #315b9d;
-  box-shadow: 0 0 0 3px rgb(49 91 157 / 15%);
+.dom-preview-title {
+  margin-top: 1rem;
+}
+
+#dom-lab pre {
+  max-height: 16rem;
+}
+
+#dom-inspection {
+  margin-top: 0.5rem;
+  overflow-wrap: anywhere;
 }
 
 .controls {

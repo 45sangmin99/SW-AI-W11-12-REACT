@@ -19,7 +19,7 @@ node --run dev
 → Virtual DOM 생성 및 비교 → 필요한 변경만 실제 DOM에 적용
 ```
 
-과제 Phase 2의 컴포넌트가 상태 변경 후 새 Virtual DOM을 만들면, Phase 1에서 구현한 Diff·Patch가 이전 트리와 비교해 실제 DOM에 변경을 반영합니다. 실습 1에서는 편집한 테스트 DOM을 Virtual DOM으로 변환하고, **Patch 적용**을 눌러 같은 엔진을 직접 검증할 수 있습니다.
+과제 Phase 2의 컴포넌트가 상태 변경 후 새 Virtual DOM을 만들면, Phase 1에서 구현한 Diff·Patch가 이전 트리와 비교해 실제 DOM에 변경을 반영합니다. 실습 1에서는 입력한 HTML을 Virtual DOM으로 변환하고, **Patch 적용**으로 같은 엔진을 직접 검증할 수 있습니다.
 
 ### Diff 알고리즘과 Patch
 
@@ -82,9 +82,9 @@ node --run test
 
 ### 실습 1 — Virtual DOM, Diff, Patch
 
-1. 오른쪽 **테스트 영역**에서 샘플 제목이나 본문을 수정하고 **Patch 적용**을 누릅니다.
-2. 왼쪽 **실제 영역**에 수정한 부분만 반영되는지 확인합니다. **최근 결과**와 **내부 동작 보기**에서 변경 유형과 원본 Patch JSON을 볼 수 있습니다.
-3. **이전 상태**와 **다음 상태**를 눌러 저장된 Virtual DOM 상태를 이동합니다. 실제 영역과 테스트 영역이 함께 복원됩니다.
+1. **테스트 HTML**에서 속성 삭제·텍스트 변경·태그 교체 예제를 선택하거나 HTML을 직접 수정하고 **Patch 적용**을 누릅니다.
+2. **엔진 실행 결과**에서 이전·다음 Virtual DOM과 실제 Diff 명령을 확인합니다. `data-inspect`가 붙은 요소의 Patch 전후 DOM 참조도 비교할 수 있습니다.
+3. **이전 상태**와 **다음 상태**로 이동하면 실제 영역과 테스트 HTML이 함께 복원됩니다.
 
 ### 실습 2 — Component, State, Hooks
 

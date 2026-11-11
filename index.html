@@ -31,58 +31,63 @@
           <div class="lab-heading">
             <p class="lab-number">실습 1</p>
             <h2 id="dom-lab-title">Virtual DOM 변경 실험</h2>
-            <p>테스트 영역을 수정하고 Patch를 누르면 실제 영역의 달라진 부분만 변경됩니다.</p>
+            <p>HTML을 바꾸고 Patch를 적용해, 엔진이 만든 명령과 실제 DOM의 변화를 비교합니다.</p>
           </div>
 
           <ol class="steps" aria-label="Virtual DOM 실습 순서">
-            <li><strong>수정</strong><span>테스트 영역의 글이나 구조를 바꿉니다.</span></li>
+            <li><strong>수정</strong><span>예제를 고르거나 테스트 HTML을 수정합니다.</span></li>
             <li><strong>적용</strong><span>Patch를 눌러 두 Virtual DOM을 비교합니다.</span></li>
-            <li><strong>확인</strong><span>실제 영역과 History, 내부 결과를 확인합니다.</span></li>
+            <li><strong>확인</strong><span>Patch 명령과 실제 DOM의 재사용 여부를 확인합니다.</span></li>
           </ol>
 
           <div class="compare-grid">
-            <section class="workspace-pane" aria-labelledby="source-title">
-              <h3 id="source-title">실제 영역</h3>
-              <p class="pane-help">Patch 결과가 적용되는 영역입니다.</p>
-              <div id="actual-output" class="surface">
-                <article data-source class="sample-card" data-kind="example">
-                  <h3>Mini React</h3>
-                  <p>DOM을 Virtual DOM으로 변환합니다.</p>
-                  <button type="button" disabled>Phase 1</button>
-                </article>
-              </div>
-            </section>
-
             <section class="workspace-pane" aria-labelledby="render-title">
-              <h3 id="render-title">테스트 영역</h3>
-              <p class="pane-help">아래 내용을 직접 수정한 뒤 Patch를 누르세요.</p>
-              <div id="render-output" class="surface editable" contenteditable="true" aria-label="수정 가능한 테스트 DOM"></div>
+              <h3 id="render-title"><label for="render-output">테스트 HTML</label></h3>
+              <label for="dom-example">예제</label>
+              <select id="dom-example">
+                <option value="">선택</option>
+                <option value="initial">초기 HTML</option>
+                <option value="props">속성 삭제</option>
+                <option value="text">텍스트 변경</option>
+                <option value="replace">태그 교체</option>
+              </select>
+              <p id="dom-example-help" class="pane-help">버튼의 disabled를 지우면 기존 DOM 객체가 유지될까요?</p>
+              <textarea id="render-output" class="html-input" rows="8" spellcheck="false" aria-describedby="dom-example-help"></textarea>
               <div class="controls">
                 <button id="back-button" class="button-secondary" type="button">이전 상태</button>
                 <button id="patch-button" type="button">Patch 적용</button>
                 <button id="forward-button" class="button-secondary" type="button">다음 상태</button>
               </div>
-              <div class="patch-feedback">
-                <p class="feedback-label">최근 결과</p>
-                <p id="patch-summary" aria-live="polite">아직 Patch를 적용하지 않았습니다.</p>
-              </div>
               <p id="history-position" class="history" aria-live="polite"></p>
+
+              <h3 class="dom-preview-title">실제 영역</h3>
+              <div id="actual-output" class="surface"><article data-source class="sample-card" data-kind="example">
+  <h3>Mini React</h3>
+  <p>DOM을 Virtual DOM으로 변환합니다.</p>
+  <button data-inspect type="button" disabled>Phase 1</button>
+</article></div>
+            </section>
+
+            <section class="workspace-pane" aria-labelledby="engine-title">
+              <h3 id="engine-title">엔진 실행 결과</h3>
+              <details class="internals">
+                <summary>1. 이전·다음 Virtual DOM</summary>
+                <h4>이전</h4>
+                <pre><code id="previous-vdom-output"></code></pre>
+                <h4>다음</h4>
+                <pre><code id="vdom-output"></code></pre>
+              </details>
+              <details class="internals" open>
+                <summary>2. diff() 반환값</summary>
+                <pre><code id="diff-output"></code></pre>
+              </details>
+              <div class="patch-feedback">
+                <p class="feedback-label">3. patch() 적용 후 실제 DOM · 최근 결과</p>
+                <p id="patch-summary" aria-live="polite">아직 Patch를 적용하지 않았습니다.</p>
+                <p id="dom-inspection">비교할 요소 하나에 <code>data-inspect</code>를 붙이세요.</p>
+              </div>
             </section>
           </div>
-
-          <details class="internals">
-            <summary>내부 동작 보기 · Virtual DOM과 Diff</summary>
-            <div class="internal-grid">
-              <section aria-labelledby="result-title">
-                <h3 id="result-title">현재 Virtual DOM</h3>
-                <pre><code id="vdom-output"></code></pre>
-              </section>
-              <section aria-labelledby="diff-title">
-                <h3 id="diff-title">최근 Diff 결과</h3>
-                <pre><code id="diff-output"></code></pre>
-              </section>
-            </div>
-          </details>
         </section>
 
         <section id="component-lab" class="lab" aria-labelledby="component-title">
