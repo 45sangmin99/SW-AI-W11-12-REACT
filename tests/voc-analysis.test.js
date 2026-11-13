@@ -7,6 +7,7 @@ import {
 import { paginate, pageWindow } from "../src/voc/pagination.js";
 import { parseDataset, loadDataset, appVersionsOf } from "../src/voc/data.js";
 import { CONFIG } from "../src/voc/config.js";
+import { loadStatusHistory, saveStatus, SaveError } from "../src/voc/status-api.js";
 
 // ---- 도우미
 let seq = 0;
@@ -554,5 +555,74 @@ describe("parseDataset / loadDataset (F-03)", () => {
   });
   it("appVersionsOf: 중복 없이 정렬하고 'web'은 앱 버전이 아니므로 뺀다", () => {
     deepEq(appVersionsOf([{ app_version: "4.3.0" }, { app_version: "web" }, { app_version: "4.2.0" }, { app_version: "4.3.0" }]), ["4.2.0", "4.3.0"]);
+  });
+});
+
+describe("상태 이력 불러오기·저장 (F-08, R-14): status-api", () => {
+  // 서버 없이 확인하려고 fetch를 흉내 낸다. 본문이 없는 응답은 json이 없는 객체로 만든다
+  const reply = (status, body) => async () => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+  const bare = (status) => async () => ({ ok: status >= 200 && status < 300, status });
+  const AT = "2026-11-13T05:06:07.000Z";
+  const history = { "surge:쿠폰·할인:2026-11-07T10": [{ status: "분석 중", at: AT }] };
+  const failureOf = async (fake) => {
+    try {
+      await saveStatus("x", "a", "분석 중", fake);
+    } catch (e) {
+      return e;
+    }
+    return null;
+  };
+
+  it("loadStatusHistory: 성공하면 { 신호 ID: [{ status, at }] } 를 그대로 돌려준다", async () => {
+    deepEq(await loadStatusHistory("x", reply(200, { history })), history);
+    deepEq(await loadStatusHistory("x", reply(200, { history: {} })), {});
+  });
+  it("loadStatusHistory: 네트워크·HTTP·형식 오류를 사람이 읽을 수 있는 메시지로 (서버가 알려 준 원인도 함께)", async () => {
+    const msgs = [];
+    for (const fake of [
+      async () => { throw new TypeError("Failed to fetch"); },
+      reply(503, { error: "DBMS 서버에 연결할 수 없습니다." }),
+      bare(404),
+      reply(200, {}),
+      reply(200, { history: { a: [{ status: "없는상태", at: AT }] } }), // 정해진 5단계에 없는 상태
+      reply(200, { history: { a: [{ status: "분석 중" }] } }), // 시각이 없다
+    ]) {
+      try { await loadStatusHistory("x", fake); msgs.push("성공?!"); } catch (e) { msgs.push(e.message); }
+    }
+    assert(/불러오지 못했습니다/.test(msgs[0]));
+    assert(/503/.test(msgs[1]) && /DBMS 서버에 연결할 수 없습니다/.test(msgs[1]), msgs[1]);
+    assert(/404/.test(msgs[2]), msgs[2]);
+    for (const m of msgs.slice(3)) assert(/형식/.test(m), m);
+  });
+
+  it("saveStatus: POST로 { alertId, status }를 보내고, 서버가 알려 준 상태와 시각을 돌려준다", async () => {
+    let seen;
+    const fake = async (url, options) => {
+      seen = { url, options };
+      return { ok: true, status: 201, json: async () => ({ alertId: "a", status: "분석 중", at: AT }) };
+    };
+    deepEq(await saveStatus("api/status", "a", "분석 중", fake), { status: "분석 중", at: AT });
+    eq(seen.url, "api/status");
+    eq(seen.options.method, "POST");
+    deepEq(JSON.parse(seen.options.body), { alertId: "a", status: "분석 중" });
+  });
+  it("saveStatus: 서버가 outcome을 알려 주면 '저장 안 됨'과 '저장 여부 모름'을 그대로 구분한다", async () => {
+    const conflict = await failureOf(reply(409, { error: "다른 변경과 충돌해 저장하지 못했습니다.", outcome: "not_saved" }));
+    assert(conflict instanceof SaveError);
+    eq(conflict.outcome, "not_saved");
+    assert(/충돌/.test(conflict.message), conflict.message);
+    eq((await failureOf(reply(502, { error: "저장하지 못했습니다: x", outcome: "unknown" }))).outcome, "unknown");
+    eq((await failureOf(reply(503, { error: "DBMS 서버에 연결할 수 없습니다.", outcome: "not_saved" }))).outcome, "not_saved");
+  });
+  it("saveStatus: 결과를 알 수 없는 경우(연결 끊김·본문 없는 5xx·읽을 수 없는 성공 응답)는 모두 '저장 여부 모름'이다", async () => {
+    // 이 경우 이미 저장됐을 수 있어서, 같은 요청을 다시 보내면 같은 상태가 두 번 저장될 수 있다
+    eq((await failureOf(async () => { throw new TypeError("Failed to fetch"); })).outcome, "unknown");
+    eq((await failureOf(bare(500))).outcome, "unknown");
+    eq((await failureOf(reply(201, { nope: 1 }))).outcome, "unknown");
+  });
+  it("saveStatus: 서버가 요청을 거절한 경우(4xx, 본문 없음)는 '저장 안 됨'이고 상태 코드를 알려 준다", async () => {
+    const e = await failureOf(bare(404));
+    eq(e.outcome, "not_saved");
+    assert(/404/.test(e.message), e.message);
   });
 });

@@ -229,6 +229,7 @@ mark { padding: 0 2px; border-radius: 2px; background: var(--mark); color: inher
 .hist-status { color: var(--text); }
 .hist-at { color: var(--text-3); font-variant-numeric: tabular-nums; }
 .progress .muted, .status-history .muted { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.progress .notice { margin: 0 0 8px; padding: 8px 12px; font-size: 13px; line-height: 20px; color: var(--negative); border: 1px solid color-mix(in srgb, var(--negative) 50%, transparent); border-radius: 8px; } /* 저장 실패 안내: 놓치지 않게 강조 */
 
 /* 상태 표시 (F-03) */
 .status { padding: 24px; color: var(--text-3); text-align: center; }

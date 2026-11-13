@@ -228,9 +228,10 @@ export function EvidenceList({ alert, evidence, onPageChange }) {
   );
 }
 
-// ---------------------------------------------------------------- ⑥ ProgressPanel (F-08, R-14): 임시 버전
-// props는 정의서 그대로: alertId, currentStatus, history, onStatusChange. 상태는 가지지 않는다 (C-03).
-export function ProgressPanel({ alertId, currentStatus: current, history, onStatusChange }) {
+// ---------------------------------------------------------------- ⑥ ProgressPanel (F-08, R-14)
+// props는 정의서의 alertId, currentStatus, history, onStatusChange에 저장 상태를 보여주는 persisted, saving, notice를 더했다.
+// persisted: DB에 저장되는 모드인가 / saving: 저장 요청을 기다리는 중인가 / notice: 저장 실패 안내. 상태는 가지지 않는다 (C-03).
+export function ProgressPanel({ alertId, currentStatus: current, history, onStatusChange, persisted = false, saving = false, notice = "" }) {
   return h(
     "section",
     { class: "panel progress", "aria-label": "진행 현황", "data-alert": alertId },
@@ -241,7 +242,7 @@ export function ProgressPanel({ alertId, currentStatus: current, history, onStat
       STATUSES.map((s) =>
         h(
           "button",
-          { type: "button", class: `${s === current ? "btn step current" : "btn step"} ${stClass(s)}`, "aria-pressed": s === current ? "true" : "false", disabled: s !== current && !canChangeTo(current, s), onClick: () => onStatusChange(alertId, s) },
+          { type: "button", class: `${s === current ? "btn step current" : "btn step"} ${stClass(s)}`, "aria-pressed": s === current ? "true" : "false", disabled: saving || (s !== current && !canChangeTo(current, s)), onClick: () => onStatusChange(alertId, s) },
           s,
         ),
       ),
@@ -253,7 +254,9 @@ export function ProgressPanel({ alertId, currentStatus: current, history, onStat
         ? h("li", { class: "muted" }, "변경 이력이 없습니다")
         : history.slice().reverse().map((row) => h("li", null, h("span", { class: "hist-status" }, row.status), h("span", { class: "hist-at" }, `${row.at.slice(5, 16).replace("T", " ")} UTC`))),
     ),
-    h("p", { class: "muted" }, "이 브라우저에만 임시로 저장됩니다. 새로고침하면 사라집니다"),
+    saving ? h("p", { class: "muted", role: "status" }, "저장 중…") : null,
+    notice ? h("p", { class: "notice", role: "alert" }, notice) : null,
+    h("p", { class: "muted" }, persisted ? "상태 변경은 DB에 저장되어 새로고침해도 유지됩니다" : "이 브라우저에만 임시로 저장됩니다. 새로고침하면 사라집니다"),
   );
 }
 

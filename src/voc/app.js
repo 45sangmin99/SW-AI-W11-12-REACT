@@ -10,7 +10,9 @@ import { currentStatus, appendStatus } from "./status.js";
 
 // props: dataUrl(데이터 위치), load(불러오기 함수), now(상태를 바꾼 시각을 만드는 함수).
 // load와 now는 테스트에서 바꿔 끼우기 위한 것이고, 기본값이 실제 동작이다
-export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset, now = () => new Date().toISOString() } = {}) {
+// loadHistory(저장된 상태 이력 불러오기)와 saveStatus(상태 저장)는 DB에 저장할 때만 넣는다.
+// 넣지 않으면(샘플 모드·테스트) 상태는 화면 메모리에만 두고 바로 반영한다
+export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset, now = () => new Date().toISOString(), loadHistory, saveStatus } = {}) {
   // ---- 필터 (R-03, F-07)
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState("all");
@@ -27,17 +29,22 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
   const [loadState, setLoadState] = useState({ status: "loading", message: "" });
   // ---- 신호 진행 상태 이력 (F-08, R-14, Step 1 임시 버전): { 신호 ID: [{ status, at }, ...] }. 이력은 새 행만 추가한다
   const [statusLog, setStatusLog] = useState({});
+  // ---- 저장 요청의 진행·결과: 저장 중에는 버튼을 잠그고(같은 상태가 두 번 저장되는 것을 막는다), 실패하면 이유를 보여준다
+  const [saveState, setSaveState] = useState({ saving: false, message: "", alertId: null });
 
   // 문의 데이터 불러오기 (Step 1은 공용 샘플 JSON, Step 4에서 문의 서비스 API로 교체)
   useEffect(() => {
     let cancelled = false;
-    load(dataUrl)
-      .then(({ inquiries: loaded, meta: loadedMeta, skipped }) => {
+    // 문의와 저장된 상태 이력을 함께 불러온다. 하나라도 실패하면 오류 화면이다
+    // (이력 없이 보여주면 DB에 이력이 있는데도 모두 "확인 필요"로 보이는 거짓 화면이 된다)
+    Promise.all([load(dataUrl), loadHistory ? loadHistory() : null])
+      .then(([{ inquiries: loaded, meta: loadedMeta, skipped }, history]) => {
         if (cancelled) return;
         // 이벤트 밖(Promise 콜백)이므로 직접 batch로 묶어 렌더링을 한 번만 한다
         batch(() => {
           setInquiries(loaded);
           setMeta(loadedMeta);
+          if (history) setStatusLog(history);
           setLoadState({ status: "ready", message: skipped ? `형식이 올바르지 않은 ${skipped}건은 제외했습니다` : "" });
         });
       })
@@ -94,8 +101,29 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
   };
   // 같은 상태로의 변경은 이력에 행을 만들지 않는다 (U-06과 같은 이유: 바뀐 게 없으면 기록하지 않는다)
   const onStatusChange = (alertId, status) => {
-    if (status === currentStatus(statusLog[alertId])) return;
-    setStatusLog((log) => ({ ...log, [alertId]: appendStatus(log[alertId], status, now()) }));
+    if (saveState.saving || status === currentStatus(statusLog[alertId])) return;
+    if (!saveStatus) {
+      // 저장소가 없다 (샘플 모드·테스트): 화면에만 바로 반영한다
+      setStatusLog((log) => ({ ...log, [alertId]: appendStatus(log[alertId], status, now()) }));
+      return;
+    }
+    // 저장이 확인된 뒤에만 화면(이력)을 바꾼다. 시각은 서버가 찍은 값을 쓴다
+    setSaveState({ saving: true, message: "", alertId });
+    saveStatus(alertId, status).then(
+      (saved) =>
+        batch(() => {
+          setStatusLog((log) => ({ ...log, [alertId]: appendStatus(log[alertId], saved.status, saved.at) }));
+          setSaveState({ saving: false, message: "", alertId });
+        }),
+      (error) => {
+        // 저장 안 됨: 상태는 그대로이니 다시 눌러도 된다. 모름(그 밖의 오류 포함): 저장됐을 수 있어 확인을 안내한다
+        const message =
+          error.outcome === "not_saved"
+            ? `저장되지 않았습니다 · ${error.message}`
+            : `저장 여부를 알 수 없습니다 · ${error.message} 새로고침해서 이력을 확인한 뒤 다시 시도해 주세요`;
+        setSaveState({ saving: false, message, alertId });
+      },
+    );
   };
 
   return h(
@@ -111,7 +139,15 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
     h(SignalList, { alerts: visibleAlerts, selectedId: selected ? selected.id : null, onSelect, statusOf, ...statusProps }),
     h(SignalDetail, { alert: selected, evidence, onPageChange: setPage, ...statusProps }),
     loadState.status === "ready" && selected
-      ? h(ProgressPanel, { alertId: selected.id, currentStatus: currentStatus(statusLog[selected.id]), history: statusLog[selected.id] ?? [], onStatusChange })
+      ? h(ProgressPanel, {
+          alertId: selected.id,
+          currentStatus: currentStatus(statusLog[selected.id]),
+          history: statusLog[selected.id] ?? [],
+          onStatusChange,
+          persisted: Boolean(saveStatus),
+          saving: saveState.saving,
+          notice: saveState.alertId === selected.id ? saveState.message : "",
+        })
       : null,
     loadState.status === "ready" && loadState.message ? h("p", { class: "notice" }, loadState.message) : null,
   );

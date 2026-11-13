@@ -5,6 +5,7 @@ import { mountApp } from "../src/voc/app.js";
 import { parseDataset } from "../src/voc/data.js";
 import { detectAlerts, hourRange } from "../src/voc/analysis.js";
 import { countDomChanges } from "../src/diff.js";
+import { SaveError } from "../src/voc/status-api.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -585,6 +586,156 @@ describe("Phase 1 ↔ Phase 2 연계: 상태가 바뀌면 Diff/Patch로 일부�
       assert($(".app-header") === header);
       const touched = new Set(c.lastChanges.filter((x) => x.type !== "REBIND").map((x) => x.path[0]));
       assert(!touched.has(0), "머리글(첫 자식)은 건드리지 않았다");
+    });
+  });
+});
+
+describe("진행 상태 저장 (F-08, R-14) — DB에 저장하는 모드: 저장이 확인된 뒤에만 화면이 바뀐다", () => {
+  const AT = "2026-11-13T05:06:07.000Z";
+  const stepBtn = ({ $$ }, label) => $$(".status-steps button").find((b) => b.textContent === label);
+  const histRows = ({ $$ }) => $$(".status-history li:not(.muted)").map((li) => li.querySelector(".hist-status").textContent);
+  const firstCardStatus = ({ $$ }) => $$(".alert-status")[0].textContent;
+  const firstAlertId = (data) => detectAlerts(data.inquiries, hourRange(data.inquiries))[0].id;
+  const deferred = () => {
+    let resolve, reject;
+    const promise = new Promise((a, b) => { resolve = a; reject = b; });
+    return { promise, resolve, reject };
+  };
+  const ok = (alertId, status) => Promise.resolve({ status, at: AT });
+  /** 저장소를 흉내 낸 props. calls에 저장 요청이 쌓이고, reply가 응답을 정한다 */
+  const store = (reply, history = {}) => {
+    const calls = [];
+    return {
+      calls,
+      props: {
+        loadHistory: () => Promise.resolve(history),
+        saveStatus: (alertId, status) => {
+          calls.push([alertId, status]);
+          return reply(alertId, status);
+        },
+      },
+    };
+  };
+  const withStore = async (fn, store_, dataset) => withApp(fn, { dataset: dataset ?? parseDataset(await loadSample()), props: store_.props });
+
+  it("처음 열 때 저장된 이력을 불러와 카드와 패널에 보여준다 (마지막 행이 현재 상태)", async () => {
+    const data = parseDataset(await loadSample());
+    const history = { [firstAlertId(data)]: [{ status: "분석 중", at: AT }, { status: "조치 중", at: AT }] };
+    await withStore((ctx) => {
+      eq(firstCardStatus(ctx), "상태 · 조치 중");
+      eq(ctx.$(".status-steps .current").textContent, "조치 중");
+      deepEq(histRows(ctx), ["조치 중", "분석 중"]); // 최근 것이 위
+      assert(ctx.$$(".alert-status").slice(1).every((s) => s.textContent === "상태 · 확인 필요"), "이력이 없는 신호는 확인 필요");
+      assert(text(ctx.$(".progress")).includes("DB에 저장"), "저장 모드 안내");
+    }, store(ok, history), data);
+  });
+
+  it("저장 중에는 버튼이 잠기고 카드도 그대로이며, 저장이 확인되면 서버가 찍은 시각과 함께 바뀐다", async () => {
+    const pending = deferred();
+    const s = store(() => pending.promise);
+    const data = parseDataset(await loadSample());
+    await withStore(async (ctx) => {
+      click(stepBtn(ctx, "분석 중"));
+      deepEq(s.calls, [[firstAlertId(data), "분석 중"]]);
+      assert(text(ctx.$(".progress")).includes("저장 중"), "저장 중 표시");
+      assert(ctx.$$(".status-steps button").every((b) => b.disabled), "저장 중에는 모든 버튼이 잠긴다");
+      eq(firstCardStatus(ctx), "상태 · 확인 필요"); // 아직 바뀌지 않았다
+      eq(histRows(ctx).length, 0);
+
+      pending.resolve({ status: "분석 중", at: AT });
+      await tick(0);
+      eq(firstCardStatus(ctx), "상태 · 분석 중");
+      deepEq(histRows(ctx), ["분석 중"]);
+      assert(text(ctx.$(".status-history")).includes("11-13 05:06 UTC"), "이력의 시각은 서버가 알려 준 값");
+      assert(!text(ctx.$(".progress")).includes("저장 중"), "저장 중 표시가 사라진다");
+      assert(!stepBtn(ctx, "해결").disabled, "버튼이 다시 열린다");
+    }, s, data);
+  });
+
+  it("저장하는 동안 다른 단계 버튼을 눌러도 저장 요청은 한 번만 간다 (같은 상태가 두 번 저장되지 않게)", async () => {
+    const pending = deferred();
+    const s = store(() => pending.promise);
+    await withStore(async (ctx) => {
+      click(stepBtn(ctx, "분석 중"));
+      click(stepBtn(ctx, "조치 중"));
+      click(stepBtn(ctx, "분석 중"));
+      eq(s.calls.length, 1);
+      pending.resolve({ status: "분석 중", at: AT });
+      await tick(0);
+      deepEq(histRows(ctx), ["분석 중"]);
+    }, s);
+  });
+
+  it("저장되지 않았다고 알려 주면 화면은 그대로이고 이유가 보이며, 같은 버튼을 다시 눌러 시도할 수 있다", async () => {
+    let n = 0;
+    const s = store((a, st) => (n++ === 0 ? Promise.reject(new SaveError("DBMS 서버에 연결할 수 없습니다.", "not_saved")) : ok(a, st)));
+    await withStore(async (ctx) => {
+      click(stepBtn(ctx, "분석 중"));
+      await tick(0);
+      const alertText = text(ctx.$(".progress [role=alert]"));
+      assert(alertText.includes("저장되지 않았습니다") && alertText.includes("DBMS 서버에 연결할 수 없습니다"), alertText);
+      eq(firstCardStatus(ctx), "상태 · 확인 필요");
+      eq(histRows(ctx).length, 0);
+      assert(!stepBtn(ctx, "분석 중").disabled, "실패 뒤에는 다시 누를 수 있다");
+
+      click(stepBtn(ctx, "분석 중"));
+      await tick(0);
+      eq(firstCardStatus(ctx), "상태 · 분석 중");
+      assert(!ctx.$(".progress [role=alert]"), "성공하면 실패 안내가 사라진다");
+      eq(s.calls.length, 2);
+    }, s);
+  });
+
+  it("저장 여부를 알 수 없으면 화면은 그대로이고 새로고침 확인을 안내하며, 저절로 다시 보내지 않는다", async () => {
+    const s = store(() => Promise.reject(new SaveError("서버와 연결이 끊어졌습니다.", "unknown")));
+    await withStore(async (ctx) => {
+      click(stepBtn(ctx, "분석 중"));
+      await tick(30);
+      const alertText = text(ctx.$(".progress [role=alert]"));
+      assert(alertText.includes("저장 여부를 알 수 없습니다") && alertText.includes("새로고침"), alertText);
+      eq(firstCardStatus(ctx), "상태 · 확인 필요");
+      eq(s.calls.length, 1, "자동 재시도 없음");
+    }, s);
+  });
+
+  it("예상하지 못한 오류도 저장 여부를 알 수 없는 것으로 다룬다 (저장됐을 수 있으므로)", async () => {
+    const s = store(() => Promise.reject(new Error("boom")));
+    await withStore(async (ctx) => {
+      click(stepBtn(ctx, "분석 중"));
+      await tick(0);
+      assert(text(ctx.$(".progress [role=alert]")).includes("저장 여부를 알 수 없습니다"));
+      eq(firstCardStatus(ctx), "상태 · 확인 필요");
+    }, s);
+  });
+
+  it("저장 실패 안내는 그 신호에서만 보이고, 다른 신호를 보면 사라진다", async () => {
+    const s = store(() => Promise.reject(new SaveError("충돌", "not_saved")));
+    await withStore(async (ctx) => {
+      click(stepBtn(ctx, "분석 중"));
+      await tick(0);
+      assert(ctx.$(".progress [role=alert]"), "실패 안내");
+      click(ctx.$$(".alert-card")[1]);
+      assert(!ctx.$(".progress [role=alert]"), "다른 신호에는 보이지 않는다");
+    }, s);
+  });
+
+  it("저장된 이력을 불러오지 못하면 오류 화면이다 (이력이 있는데 모두 '확인 필요'로 보이는 거짓 화면을 만들지 않는다)", async () => {
+    await withApp(
+      async (ctx) => {
+        eq(ctx.$$(".alert-card").length, 0);
+        assert(text(ctx.box).includes("진행 상태를 불러오지 못했습니다"), text(ctx.box).slice(0, 200));
+        assert(!ctx.$(".progress"), "진행 현황 패널도 없다");
+      },
+      { props: { loadHistory: () => Promise.reject(new Error("진행 상태를 불러오지 못했습니다. (HTTP 503)")), saveStatus: ok } },
+    );
+  });
+
+  it("저장소를 넣지 않은 모드(샘플 모드)는 바로 반영되고, 이 브라우저에만 임시로 저장된다고 알려 준다", async () => {
+    await withApp((ctx) => {
+      assert(text(ctx.$(".progress")).includes("이 브라우저에만 임시로 저장됩니다"));
+      click(stepBtn(ctx, "분석 중"));
+      eq(firstCardStatus(ctx), "상태 · 분석 중"); // 기다림 없이 바로
+      assert(!text(ctx.$(".progress")).includes("저장 중"));
     });
   });
 });
