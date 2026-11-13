@@ -10,8 +10,8 @@ ASAN_ENV = detect_leaks=0
 else
 ASAN_ENV = detect_leaks=1
 endif
-.PHONY: all test asan tsan test-small-order test-crash test-queue test-lifecycle bench bench-server clean
-all: $(BUILD)/mini-db $(BUILD)/mini-db-server $(BUILD)/libmdb.a
+.PHONY: all test asan tsan test-small-order test-crash test-queue test-lifecycle test-console bench bench-server clean
+all: $(BUILD)/mini-db $(BUILD)/mini-db-server $(BUILD)/mini-db-console $(BUILD)/libmdb.a
 $(BUILD):
 	mkdir -p $@
 $(BUILD)/%.o: src/%.c include/mdb.h include/bpt.h | $(BUILD)
@@ -30,7 +30,7 @@ $(BUILD)/test-bpt: tests/test_bpt.c src/bpt.c include/bpt.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -DMDB_BPT_TEST_ALLOC tests/test_bpt.c src/bpt.c $(LDLIBS) -o $@
 $(BUILD)/test-protocol: tests/test_protocol.c $(OBJ) $(BUILD)/query_json.o | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $< $(OBJ) $(BUILD)/query_json.o $(LDLIBS) -o $@
-test: test-queue test-lifecycle all $(BUILD)/test-sql $(BUILD)/test-bpt $(BUILD)/test-engine $(BUILD)/test-protocol
+test: test-queue test-lifecycle test-console all $(BUILD)/test-sql $(BUILD)/test-bpt $(BUILD)/test-engine $(BUILD)/test-protocol
 	./$(BUILD)/test-sql
 	./$(BUILD)/test-bpt
 	./$(BUILD)/test-engine
@@ -67,3 +67,13 @@ $(BUILD)/mini-db-server-lifecycle: src/server.c src/query_json.c $(CORE) include
 	$(CC) $(CPPFLAGS) $(CFLAGS) -DMDB_TESTING -DSESSION_TTL=1 src/server.c src/query_json.c $(CORE) $(LDLIBS) -o $@
 test-lifecycle: all $(BUILD)/mini-db-server-lifecycle
 	MDB_CLI="$(CURDIR)/$(BUILD)/mini-db" MDB_SERVER_LIFECYCLE="$(CURDIR)/$(BUILD)/mini-db-server-lifecycle" python3 tests/test_lifecycle.py
+
+# ---- Mini DB 콘솔: 입력 -> 실행 -> 출력 (엔진 라이브러리를 직접 호출한다)
+$(BUILD)/console_core.o $(BUILD)/console.o: include/console.h
+$(BUILD)/mini-db-console: $(OBJ) $(BUILD)/console_core.o $(BUILD)/console.o
+	$(CC) $(CFLAGS) $^ $(LDLIBS) -o $@
+$(BUILD)/test-console-core: tests/test_console_core.c $(OBJ) $(BUILD)/console_core.o include/console.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) tests/test_console_core.c $(OBJ) $(BUILD)/console_core.o $(LDLIBS) -o $@
+test-console: all $(BUILD)/test-console-core
+	./$(BUILD)/test-console-core
+	MDB_CLI="$(CURDIR)/$(BUILD)/mini-db" MDB_CONSOLE="$(CURDIR)/$(BUILD)/mini-db-console" python3 tests/test_console.py

@@ -65,6 +65,30 @@ python3 tools/dev-proxy.py                                              # 터미
 - DBMS가 꺼져 있으면 화면에 원인이 보인다. DB 없이 보려면 `?source=sample`로 연다 (이때 상태는 이 브라우저에만 임시로 저장된다).
 - DBMS 자체의 설계와 검증은 [`dbms/readme.md`](dbms/readme.md)를 본다.
 
+### DB 콘솔 (SQL을 직접 입력해 확인하기)
+
+저장된 데이터를 화면 없이 확인하거나 SQL을 직접 실행해 보는 터미널 도구다. `sqlite3` 같은 입력 → 실행 → 출력 반복 방식이고, 엔진 함수(`mdb_execute`)를 직접 호출한다.
+
+```bash
+make -C dbms/reliable                                          # mini-db-console 도 함께 빌드된다
+./dbms/reliable/build/mini-db-console --data-dir db/data
+```
+
+```
+mydb> SELECT id, status FROM alert_status_history WHERE id = 1;
+mydb> BEGIN;
+mydb(tx)> ... ROLLBACK;
+mydb> .quit
+```
+
+- SQL은 세미콜론(`;`)으로 끝나고 여러 줄로 써도 된다. `.help` `.tables` `.schema [이름]` `.quit`(`.exit`, `\q`, Ctrl-D)을 쓴다. Ctrl-C는 쓰던 입력만 취소한다.
+- 결과는 표로 나온다 (숫자 열은 오른쪽 정렬, 한글은 2칸으로 계산). 아래에 몇 행인지, 인덱스를 썼는지(`인덱스 조회`/`전체 훑기`), 걸린 시간이 붙는다. `INSERT`/`UPDATE`/`DELETE`는 영향받은 행 수와 커밋 상태(`DURABLE`, 트랜잭션 안이면 `STAGED`)를 보여 준다.
+- 문법 오류는 오류가 난 자리를 `^`로 가리킨다. 오류가 나도 콘솔은 계속된다. 스크립트로 입력을 넣으면 오류가 있었을 때 종료 코드 1을 돌려준다.
+- 커밋 결과를 알 수 없으면(`UNKNOWN`) 거짓으로 성공이라 하지 않고 복구가 필요하다고 알린 뒤 SQL을 더 보내지 않는다. 다시 실행하면 로그로 복구한다.
+- 이 엔진에는 `NULL`이 없다. 빈 문자열은 빈 칸으로 보이고 `NULL`로 표시하지 않는다. 지원하는 문장은 `SELECT` `INSERT` `UPDATE` `DELETE` `BEGIN` `COMMIT` `ROLLBACK`뿐이다.
+- 한 데이터 폴더는 한 프로세스만 열 수 있다. **DBMS 서버가 켜져 있으면 같은 폴더를 콘솔로 열 수 없으니** 서버를 끄고 쓴다.
+- 시험: `make -C dbms/reliable test-console` (C 단위 시험 + 실제 프로세스 기능 시험 23개, 강제 종료·장애 주입 복구 포함).
+
 ## 구현 범위
 
 | 단계 | 내용 | 파일 |
