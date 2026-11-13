@@ -314,6 +314,22 @@ def test_unknown_commit_blocks_sql_and_rerun_recovers():
         assert 'DURABLE' in r.stdout and names(p)[-1] == 'again'
 
 
+def test_io_error_tells_whether_it_was_saved():
+    """오류로 보여도 저장됐거나(다시 실행하면 중복) 저장되지 않았다는 사실을 한국어로 알려 준다"""
+    folder, p = fresh()
+    with folder:
+        r = console(p, INS % 'durable but error' + '\nSELECT 1;\n', env={'MDB_IO_FAIL': 'applied_write'})
+        assert '커밋은 확정됐습니다 (DURABLE' in r.stderr and '다시 실행하지 마세요' in r.stderr, r.stderr
+        assert names(p) == ['durable but error']  # 말한 대로 실제로 저장되어 있다
+    folder, p = fresh()
+    with folder:
+        r = console(p, INS % 'not saved' + '\n', env={'MDB_IO_FAIL': 'csv_write'})
+        assert '저장되지 않았습니다 (NOT_COMMITTED)' in r.stderr and 'DURABLE' not in r.stderr, r.stderr
+        assert names(p) == []  # 말한 대로 실제로 저장되지 않았다
+        r = console(p, "SELEC;\n")  # 일반 오류에는 붙지 않는다
+        assert '저장되지 않았습니다' not in r.stderr and 'NOT_COMMITTED' not in r.stderr, r.stderr
+
+
 # ------------------------------------------------------------------ 터미널(pty)에서의 대화
 class Terminal:
     def __init__(self, path):

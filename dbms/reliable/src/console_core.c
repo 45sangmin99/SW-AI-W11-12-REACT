@@ -278,6 +278,14 @@ void con_report(FILE *out, FILE *err, const char *sql, int rc, const mdb_result 
                 "  커밋됐는지 알 수 없습니다 (UNKNOWN, txid %" PRIu64 "). 콘솔을 다시 실행하면 로그로 복구하고,\n"
                 "  확정 여부는 mini-db --data-dir 폴더 --tx-status %" PRIu64 " 로 확인할 수 있습니다\n",
                 r->txid, r->txid);
+    /* 오류로 보여도 변경은 확정됐을 수 있다: 같은 문장을 다시 실행하면 중복 저장되므로 분명히 알린다 */
+    if (r->commit == MDB_DURABLE)
+        fprintf(err,
+                "  그래도 커밋은 확정됐습니다 (DURABLE, txid %" PRIu64 "). 변경은 저장되어 있으니 같은 문장을 다시 실행하지 마세요 (중복 저장됩니다)\n",
+                r->txid);
+    /* 입출력 오류로 저장되지 않았다는 것을 분명히 알린다 (문법 오류 같은 일반 오류에는 붙이지 않는다) */
+    if (r->commit == MDB_NOT_COMMITTED && r->error.code == MDB_IO)
+        fputs("  저장되지 않았습니다 (NOT_COMMITTED). 변경이 반영되지 않았으니 다시 시도해도 중복되지 않습니다\n", err);
     if (r->recovery_required)
         fputs("  엔진이 복구가 필요하다고 알렸습니다. 이후 SQL은 실행하지 않습니다.\n"
               "  .quit 로 나간 뒤 다시 실행하면 로그에서 자동으로 복구합니다\n",

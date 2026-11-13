@@ -314,6 +314,41 @@ static void test_messages(void) {
     con_report(c.fo, c.fe, "COMMIT;", -1, &r, 0.1);
     capture_close(&c);
     assert(has(c.err, "UNKNOWN, txid 9") && has(c.err, "--tx-status 9") && has(c.err, "복구가 필요"));
+    assert(!has(c.err, "NOT_COMMITTED") && !has(c.err, "DURABLE"));
+    capture_free(&c);
+
+    /* 오류로 보여도 커밋이 확정된 경우: 다시 실행하면 중복 저장되므로 그 사실을 말한다 */
+    r = base();
+    r.error.code = MDB_IO;
+    r.commit = MDB_DURABLE, r.txid = 4097, r.recovery_required = 1;
+    snprintf(r.error.message, sizeof r.error.message, "Commit is durable; CSV/completion needs recovery before further SQL");
+    capture_open(&c);
+    con_report(c.fo, c.fe, "INSERT INTO t VALUES ('x');", -1, &r, 0.1);
+    capture_close(&c);
+    assert(has(c.err, "커밋은 확정됐습니다 (DURABLE, txid 4097)") && has(c.err, "다시 실행하지 마세요") && has(c.err, "복구가 필요"));
+    assert(!has(c.err, "NOT_COMMITTED"));
+    capture_free(&c);
+
+    /* 입출력 오류로 저장되지 않은 경우: 다시 시도해도 안전하다고 말한다 */
+    r = base();
+    r.error.code = MDB_IO;
+    r.commit = MDB_NOT_COMMITTED;
+    snprintf(r.error.message, sizeof r.error.message, "write failed");
+    capture_open(&c);
+    con_report(c.fo, c.fe, "INSERT INTO t VALUES ('x');", -1, &r, 0.1);
+    capture_close(&c);
+    assert(has(c.err, "저장되지 않았습니다 (NOT_COMMITTED)") && has(c.err, "중복되지 않습니다") && !has(c.err, "DURABLE"));
+    capture_free(&c);
+
+    /* 일반 오류(문법 등)에는 저장 여부 안내를 붙이지 않는다: 매번 나오면 소음이다 */
+    r = base();
+    r.error.code = MDB_SYNTAX;
+    r.commit = MDB_NOT_COMMITTED;
+    snprintf(r.error.message, sizeof r.error.message, "x");
+    capture_open(&c);
+    con_report(c.fo, c.fe, "SELEC;", -1, &r, 0.1);
+    capture_close(&c);
+    assert(!has(c.err, "NOT_COMMITTED") && !has(c.err, "DURABLE") && !has(c.err, "저장되지 않았습니다"));
     capture_free(&c);
 }
 
