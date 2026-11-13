@@ -1,0 +1,3 @@
+# Existing schema: lowercase table name, then column:type declarations.
+users id:INTEGER name:TEXT(64) age:INTEGER
+products id:INTEGER name:TEXT(128) price:INTEGER

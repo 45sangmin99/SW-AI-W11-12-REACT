@@ -1,0 +1,791 @@
+{
+  "count_requested": 1000000,
+  "seed": 42,
+  "platform": "macOS-26.5.1-arm64-arm-64bit",
+  "python": "3.9.6",
+  "measurement": "wall-clock real loopback HTTP; includes connection, JSON encode/decode and body read; excludes terminal output",
+  "cache": "warm engine and OS cache after startup plus explicit warmups; no cold-cache claim",
+  "durability": "normal WAL/CSV fsync policy; no relaxed durability mode",
+  "isolation": "global optimistic commit version; mixed writes may conflict even for different rows",
+  "mixed_write_fraction": "1/16; UPDATE keeps id and k stable",
+  "percentile": "nearest-rank p99 across successful and failed measured requests; report sample size",
+  "retry_policy": "none; transport failure may have committed and is recorded as unknown",
+  "rows_are_strings": "INT results are decimal strings to preserve int64 precision",
+  "batches": [
+    {
+      "workers": 1,
+      "clients": 1,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.03691779200000056,
+      "requests_per_second": 3467.1629332544608,
+      "successful_requests_per_second": 3467.1629332544608,
+      "latency_mean_s": 0.0002574644921875119,
+      "latency_median_s": 0.00025020800000064014,
+      "latency_p99_s": 0.0003926249999999243,
+      "latency_max_s": 0.0010742500000002764,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 1,
+      "clients": 1,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 12.835753541999999,
+      "requests_per_second": 9.972145350186874,
+      "successful_requests_per_second": 9.972145350186874,
+      "latency_mean_s": 0.10026707775781245,
+      "latency_median_s": 0.0002967705000003207,
+      "latency_p99_s": 1.6233597920000005,
+      "latency_max_s": 1.742871040999999,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 1,
+      "clients": 4,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.024818833000001206,
+      "requests_per_second": 5157.373837842971,
+      "successful_requests_per_second": 5157.373837842971,
+      "latency_mean_s": 0.000737197960937408,
+      "latency_median_s": 0.0006985834999984064,
+      "latency_p99_s": 0.0018230000000016844,
+      "latency_max_s": 0.002078582999999412,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 1,
+      "clients": 4,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 12.425827332999997,
+      "requests_per_second": 10.301124952868362,
+      "successful_requests_per_second": 10.301124952868362,
+      "latency_mean_s": 0.3882494996562499,
+      "latency_median_s": 0.0008743124999988083,
+      "latency_p99_s": 1.6277430840000022,
+      "latency_max_s": 1.6279157920000031,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 1,
+      "clients": 16,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.02869454199999666,
+      "requests_per_second": 4460.778638669853,
+      "successful_requests_per_second": 4460.778638669853,
+      "latency_mean_s": 0.003153245156249984,
+      "latency_median_s": 0.0029904374999993877,
+      "latency_p99_s": 0.007151374999999405,
+      "latency_max_s": 0.00818479200000155,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 1,
+      "clients": 16,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 12.765355374999999,
+      "requests_per_second": 10.027139569547629,
+      "successful_requests_per_second": 10.027139569547629,
+      "latency_mean_s": 1.5537122711640623,
+      "latency_median_s": 1.5494946459999994,
+      "latency_p99_s": 3.2231760000000023,
+      "latency_max_s": 3.2263448339999954,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 1,
+      "clients": 64,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.03724433400000038,
+      "requests_per_second": 3436.7643679706744,
+      "successful_requests_per_second": 3436.7643679706744,
+      "latency_mean_s": 0.012242428117187787,
+      "latency_median_s": 0.011193604000002466,
+      "latency_p99_s": 0.026085666000000174,
+      "latency_max_s": 0.027907792000000597,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 1,
+      "clients": 64,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 12.920804292,
+      "requests_per_second": 9.906504046288514,
+      "successful_requests_per_second": 9.906504046288514,
+      "latency_mean_s": 5.61091725878125,
+      "latency_median_s": 6.4488291454999995,
+      "latency_p99_s": 9.950168249999997,
+      "latency_max_s": 9.950266124999999,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 2,
+      "clients": 1,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.03559533299998918,
+      "requests_per_second": 3595.977034406137,
+      "successful_requests_per_second": 3595.977034406137,
+      "latency_mean_s": 0.00026611559375055993,
+      "latency_median_s": 0.0002629374999969514,
+      "latency_p99_s": 0.00039583299999890187,
+      "latency_max_s": 0.0014509589999960326,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 2,
+      "clients": 1,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 12.481124332999997,
+      "requests_per_second": 10.25548633159346,
+      "successful_requests_per_second": 10.25548633159346,
+      "latency_mean_s": 0.09749470410156258,
+      "latency_median_s": 0.00031641650000580057,
+      "latency_p99_s": 1.6188744170000007,
+      "latency_max_s": 1.6442323749999872,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 2,
+      "clients": 4,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.024120832999997788,
+      "requests_per_second": 5306.616069188479,
+      "successful_requests_per_second": 5306.616069188479,
+      "latency_mean_s": 0.000702192999999518,
+      "latency_median_s": 0.0006777289999959635,
+      "latency_p99_s": 0.001129457999994088,
+      "latency_max_s": 0.0020629580000104397,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 2,
+      "clients": 4,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 6.065142666999989,
+      "requests_per_second": 21.104202658980952,
+      "successful_requests_per_second": 20.444696325887797,
+      "latency_mean_s": 0.1895010351796872,
+      "latency_median_s": 0.0006468959999992308,
+      "latency_p99_s": 1.5443100409999886,
+      "latency_max_s": 1.5451923340000064,
+      "outcomes": {
+        "success": 124,
+        "conflict": 4
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 4
+      },
+      "unexpected_samples": []
+    },
+    {
+      "workers": 2,
+      "clients": 16,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.028278000000000247,
+      "requests_per_second": 4526.487021712953,
+      "successful_requests_per_second": 4526.487021712953,
+      "latency_mean_s": 0.003054226554687123,
+      "latency_median_s": 0.002888208499996381,
+      "latency_p99_s": 0.006206584000011617,
+      "latency_max_s": 0.006916083999996658,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 2,
+      "clients": 16,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 6.052596582999996,
+      "requests_per_second": 21.147948363106703,
+      "successful_requests_per_second": 20.48707497675962,
+      "latency_mean_s": 0.7560963369218759,
+      "latency_median_s": 0.005346166499997196,
+      "latency_p99_s": 3.0073359579999988,
+      "latency_max_s": 3.029440374999993,
+      "outcomes": {
+        "success": 124,
+        "conflict": 4
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 4
+      },
+      "unexpected_samples": []
+    },
+    {
+      "workers": 2,
+      "clients": 64,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.038005083000001605,
+      "requests_per_second": 3367.9705422560082,
+      "successful_requests_per_second": 3367.9705422560082,
+      "latency_mean_s": 0.012447654671874475,
+      "latency_median_s": 0.011698791499995309,
+      "latency_p99_s": 0.025552042000001052,
+      "latency_max_s": 0.03169220899999914,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 2,
+      "clients": 64,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 6.24066104100001,
+      "requests_per_second": 20.510647695662886,
+      "successful_requests_per_second": 19.86968995517342,
+      "latency_mean_s": 2.3462107864453126,
+      "latency_median_s": 3.0928729374999975,
+      "latency_p99_s": 4.675509582999993,
+      "latency_max_s": 4.676416290999995,
+      "outcomes": {
+        "success": 124,
+        "conflict": 4
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 4
+      },
+      "unexpected_samples": []
+    },
+    {
+      "workers": 4,
+      "clients": 1,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.03607762499999012,
+      "requests_per_second": 3547.9053845710478,
+      "successful_requests_per_second": 3547.9053845710478,
+      "latency_mean_s": 0.00026396612499912653,
+      "latency_median_s": 0.00026145849999892334,
+      "latency_p99_s": 0.0004234999999965794,
+      "latency_max_s": 0.0013168329999899697,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 4,
+      "clients": 1,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 13.365958917,
+      "requests_per_second": 9.576566918606817,
+      "successful_requests_per_second": 9.576566918606817,
+      "latency_mean_s": 0.10440528739062482,
+      "latency_median_s": 0.00035431199999891305,
+      "latency_p99_s": 1.7100288329999955,
+      "latency_max_s": 1.7106601670000003,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 4,
+      "clients": 4,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.0238530409999953,
+      "requests_per_second": 5366.192092657084,
+      "successful_requests_per_second": 5366.192092657084,
+      "latency_mean_s": 0.0007076226953129927,
+      "latency_median_s": 0.0006621459999962553,
+      "latency_p99_s": 0.00222237500000233,
+      "latency_max_s": 0.002319458000002328,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 4,
+      "clients": 4,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 5.226788500000012,
+      "requests_per_second": 24.489225075780226,
+      "successful_requests_per_second": 23.53261472125756,
+      "latency_mean_s": 0.13691414321093776,
+      "latency_median_s": 0.0005721034999979224,
+      "latency_p99_s": 1.8462800829999964,
+      "latency_max_s": 1.8491446670000045,
+      "outcomes": {
+        "success": 123,
+        "conflict": 5
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 5
+      },
+      "unexpected_samples": []
+    },
+    {
+      "workers": 4,
+      "clients": 16,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.024523582999989912,
+      "requests_per_second": 5219.465687377438,
+      "successful_requests_per_second": 5219.465687377438,
+      "latency_mean_s": 0.0026340090937498895,
+      "latency_median_s": 0.002498895500004039,
+      "latency_p99_s": 0.004937458999989985,
+      "latency_max_s": 0.005809249999998656,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 4,
+      "clients": 16,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 5.162721665999996,
+      "requests_per_second": 24.79312430165785,
+      "successful_requests_per_second": 23.82464288362434,
+      "latency_mean_s": 0.6320667701406245,
+      "latency_median_s": 0.0047888539999974,
+      "latency_p99_s": 3.485083750000001,
+      "latency_max_s": 3.4969482089999957,
+      "outcomes": {
+        "success": 123,
+        "conflict": 5
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 5
+      },
+      "unexpected_samples": []
+    },
+    {
+      "workers": 4,
+      "clients": 64,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.03763504100000148,
+      "requests_per_second": 3401.085706270254,
+      "successful_requests_per_second": 3401.085706270254,
+      "latency_mean_s": 0.012111591453125237,
+      "latency_median_s": 0.010618208000003904,
+      "latency_p99_s": 0.028323499999999058,
+      "latency_max_s": 0.030071290999998723,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 4,
+      "clients": 64,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 4.925736834000006,
+      "requests_per_second": 25.9859599312081,
+      "successful_requests_per_second": 24.970883371395285,
+      "latency_mean_s": 1.237690149109375,
+      "latency_median_s": 1.6233032085000119,
+      "latency_p99_s": 3.2980337080000055,
+      "latency_max_s": 3.308905749999994,
+      "outcomes": {
+        "conflict": 5,
+        "success": 123
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 5
+      },
+      "unexpected_samples": []
+    },
+    {
+      "workers": 8,
+      "clients": 1,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.03774791700001856,
+      "requests_per_second": 3390.915583499271,
+      "successful_requests_per_second": 3390.915583499271,
+      "latency_mean_s": 0.00028186750781244996,
+      "latency_median_s": 0.0002771249999966585,
+      "latency_p99_s": 0.0004279169999961141,
+      "latency_max_s": 0.0012998750000008386,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 8,
+      "clients": 1,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 12.450939333999997,
+      "requests_per_second": 10.280348860946432,
+      "successful_requests_per_second": 10.280348860946432,
+      "latency_mean_s": 0.09725967091406251,
+      "latency_median_s": 0.00031325000000492764,
+      "latency_p99_s": 1.6166510420000009,
+      "latency_max_s": 1.6277646249999975,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 8,
+      "clients": 4,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.0247681660000012,
+      "requests_per_second": 5167.924019888828,
+      "successful_requests_per_second": 5167.924019888828,
+      "latency_mean_s": 0.0007259899140636961,
+      "latency_median_s": 0.0006832919999908427,
+      "latency_p99_s": 0.001452874999984033,
+      "latency_max_s": 0.0020459160000143584,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 8,
+      "clients": 4,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 4.551092625000024,
+      "requests_per_second": 28.12511424111025,
+      "successful_requests_per_second": 27.02647696606688,
+      "latency_mean_s": 0.11884267903906287,
+      "latency_median_s": 0.00046656199999972614,
+      "latency_p99_s": 1.522766415999996,
+      "latency_max_s": 1.5250072089999946,
+      "outcomes": {
+        "success": 123,
+        "conflict": 5
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 5
+      },
+      "unexpected_samples": []
+    },
+    {
+      "workers": 8,
+      "clients": 16,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.028305208000006132,
+      "requests_per_second": 4522.135997021193,
+      "successful_requests_per_second": 4522.135997021193,
+      "latency_mean_s": 0.00306794666406085,
+      "latency_median_s": 0.00290114549997611,
+      "latency_p99_s": 0.005760541000000785,
+      "latency_max_s": 0.0060091249999914,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 8,
+      "clients": 16,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 6.006604166000017,
+      "requests_per_second": 21.30987767173597,
+      "successful_requests_per_second": 20.64394399449422,
+      "latency_mean_s": 0.575172659140625,
+      "latency_median_s": 0.003914624499998354,
+      "latency_p99_s": 2.9738791249999963,
+      "latency_max_s": 3.0155988330000127,
+      "outcomes": {
+        "success": 124,
+        "conflict": 4
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 4
+      },
+      "unexpected_samples": []
+    },
+    {
+      "workers": 8,
+      "clients": 64,
+      "workload": "index",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "id": 128
+      },
+      "elapsed_s": 0.038379665999997314,
+      "requests_per_second": 3335.0993726732527,
+      "successful_requests_per_second": 3335.0993726732527,
+      "latency_mean_s": 0.012409867460936974,
+      "latency_median_s": 0.010864604500014252,
+      "latency_p99_s": 0.027577624999992167,
+      "latency_max_s": 0.02762308300000882,
+      "outcomes": {
+        "success": 128
+      },
+      "error_codes": {},
+      "unexpected_samples": []
+    },
+    {
+      "workers": 8,
+      "clients": 64,
+      "workload": "mixed",
+      "repeat": 0,
+      "requests": 128,
+      "operations": {
+        "update": 8,
+        "id": 120
+      },
+      "elapsed_s": 3.0829512920000184,
+      "requests_per_second": 41.51865789516315,
+      "successful_requests_per_second": 39.57247080632738,
+      "latency_mean_s": 0.9249139475156278,
+      "latency_median_s": 1.5198123750000008,
+      "latency_p99_s": 3.072708750000004,
+      "latency_max_s": 3.0756292499999915,
+      "outcomes": {
+        "success": 122,
+        "conflict": 6
+      },
+      "error_codes": {
+        "ERR_CONFLICT": 6
+      },
+      "unexpected_samples": []
+    }
+  ],
+  "server_startups": [
+    {
+      "workers": 1,
+      "recovery_open_listen_s": 3.0487311250000007
+    },
+    {
+      "workers": 2,
+      "recovery_open_listen_s": 2.581522291000006
+    },
+    {
+      "workers": 4,
+      "recovery_open_listen_s": 2.8081329580000016
+    },
+    {
+      "workers": 8,
+      "recovery_open_listen_s": 2.9852048749999938
+    }
+  ],
+  "unix_time": 1794491229.091956,
+  "preparation": {
+    "method": "SQL file -> CLI parser/validator/INSERT executor -> one explicit COMMIT",
+    "sql_file_generation_s": 0.20288774999999998,
+    "cli_sql_insert_commit_s": 6.838316542,
+    "transaction_size": 1000000,
+    "stdout": "redirected to /dev/null; CLI result formatting cost remains included"
+  },
+  "actual_rows": 1000000,
+  "completed": true
+}

@@ -1,0 +1,3 @@
+id INT AUTO
+name VARCHAR(80)
+price INT

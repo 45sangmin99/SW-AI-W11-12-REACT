@@ -1,0 +1,119 @@
+{
+  "duration_seconds": 120.024,
+  "requested_seconds": 120.0,
+  "warmup_seconds": 10,
+  "clients": 4,
+  "workload": "indexed SELECT plus one malformed HTTP request per five SELECTs",
+  "successful_selects": 69616,
+  "rejected_malformed_requests": 13921,
+  "per_client": [
+    {
+      "worker": 0,
+      "successful_selects": 17403,
+      "rejected_malformed_requests": 3480
+    },
+    {
+      "worker": 1,
+      "successful_selects": 17402,
+      "rejected_malformed_requests": 3480
+    },
+    {
+      "worker": 2,
+      "successful_selects": 17408,
+      "rejected_malformed_requests": 3481
+    },
+    {
+      "worker": 3,
+      "successful_selects": 17403,
+      "rejected_malformed_requests": 3480
+    }
+  ],
+  "samples": [
+    {
+      "elapsed_seconds": 10.183,
+      "rss_kib": 1904,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 20.146,
+      "rss_kib": 1936,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 30.085,
+      "rss_kib": 1952,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 40.025,
+      "rss_kib": 2000,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 50.171,
+      "rss_kib": 1968,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 60.065,
+      "rss_kib": 2016,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 70.239,
+      "rss_kib": 1952,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 80.136,
+      "rss_kib": 2000,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 90.037,
+      "rss_kib": 2016,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 100.192,
+      "rss_kib": 2032,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 110.093,
+      "rss_kib": 2016,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 120.001,
+      "rss_kib": 2032,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    },
+    {
+      "elapsed_seconds": 120.014,
+      "rss_kib": 2032,
+      "open_fds": 11,
+      "fd_measurement": "lsof numeric descriptors"
+    }
+  ],
+  "rss_end_minus_first_kib": 128,
+  "rss_peak_kib": 2032,
+  "fd_end_minus_first": 0,
+  "fd_min": 11,
+  "fd_max": 11,
+  "final_row_count": 1,
+  "server_exit_code": 0,
+  "interpretation": "Process-specific RSS/fd observations after warmup; allocator caching and concurrent open sockets affect values. This does not prove absence of leaks."
+}
