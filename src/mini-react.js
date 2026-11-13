@@ -135,16 +135,20 @@ export class FunctionComponent {
   }
 
   /** 상태 변경 후 다시 렌더링 (P2-07): 새 Virtual DOM 생성 -> Diff -> 바뀐 부분만 Patch 
-  update():클래스 안에 정의된 메서드 앞에 function 키워드가 없는게 클래스 메서드 문법 this: 클래스 안에서 지금 이 컴포넌트 객체 자신을 가리킴(내장키워드) 
+  update():클래스 안에 정의된 메서드 앞에 function 키워드가 없는게 클래스 메서드 문법 하는일 컴포넌트 다시 렌더링->이전 가상돔과 비교(diff) 실제 돔에 반영(패치) this: 클래스 안에서 지금 이 컴포넌트 객체 자신을 가리킴(내장키워드) this.mounted:이미 화면에 붙었는지(mount됐는지) 나타내는 true/false 속성 !this.mounted: mounted가 false면 true → 아직 화면에 안 붙은 상태에서 update하면 에러 throw new Error(메시지): [내장] 에러를 일부러 발생시켜 실행을 즉시 중단
   */
   update() {
     if (!this.mounted) throw new Error("mount() 전에는 update()할 수 없습니다.")//화면에 처음 생성되어 나타내는 시점;
-    if (this.isRendering) throw new Error("렌더링 중에는 상태를 변경할 수 없습니다.");//사용자가 눈으로 볼수있는 실제 웹화면을 그려내는작업
-    const next = this.#renderVdom();
+    if (this.isRendering) throw new Error("렌더링 중에는 상태를 변경할 수 없습니다.");//this.isRendering 지금 렌더링 중인지 나타내는 속성 렌더링 도중에 업데이트 불리면 꼬이니까(무한루프)막아둔것
+    const next = this.#renderVdom();// this.#renderVdom(): [직접 만듦] 컴포넌트 함수를 실행해서 "새 Virtual DOM"을 만들어 돌려줌 #이름: [내장 문법] private(비공개) 멤버. 클래스 안쪽에서만 접근 가능하고 밖에서는 못 씀 → component.renderVdom() 처럼 밖에서 부르면 에러. 안에서만 쓰는 내부용 메서드라는 표시 next 바뀐뒤의 새 모습
     const changes = diff(this.vdom, next);
+    //patch: [직접 만듦] 변경 목록을 실제 DOM에 적용하고, 적용 후의 루트 요소를 돌려줌 이전 vdom(this.vdom)과 새 vdom(next)을 비교해서 "변경 목록(배열)"을 돌려줌 
     this.rootEl = patch(this.rootEl, changes);
-    this.lastChanges = changes; // 마지막 update()에서 만든 변경 목록 (테스트·검증용)
+    //this.rootEl: [직접 만듦]이 컴포넌트가 그려진 실제 DOM의 루트 요소 패치중에 루트 요소 자체가 교체될수있어서 루트를 다시 대입
+    this.lastChanges = changes; // 마지막 update()에서 만든 변경 목록 (테스트·검증용) 이번 업데이트에서 만든 변경 목록을 속성에 저장해둠
+    //현재vdom을 새 vdom으로 갱신 이걸 해둬야 다음 업데이트때 이전 vdom으로 쓸수 있음
     this.vdom = next;
+    //// this.#runEffects(): [직접 만듦, private] useEffect로 등록해둔 부수 효과들을 실행 순서가 중요: DOM 반영(patch)이 끝난 "다음에" 실행해야, effect 안에서 최신 화면을 볼 수 있어 (리액트도 effect는 화면 반영 후에 실행되는 것과 같은 원리)
     this.#runEffects();
   }
 
