@@ -51,6 +51,7 @@ function walk(oldNode, newNode, path, changes) {
     const prev = oldNode.props[name];
     if (prev === value) continue;
     if (typeof prev === "function" && typeof value === "function") rebind[name] = value;
+    //props를 하나씩 보면서 이전,새값이 둘다 함수면 리바인드 바구니에 이름:새함수 형태로 넣음 Object.entries(...)가 이걸 [이름, 값] 쌍의 배열로 바꿔줘.
     else set[name] = value;
   }
   // 이전 props를 하나씩 보면서: 새 props에 그 이름이 아예 없으면 remove에 담기
