@@ -154,7 +154,7 @@ describe("첫 화면 (R-01 ~ R-05)", () => {
   it("카드는 가로로 배열되고, 상세 영역은 카드 아래 전체 너비다 (실제 voc.html을 iframe으로 띄워 확인)", async () => {
     // test.html에는 페이지 CSS가 없으므로 배치는 실제 페이지에서 확인한다
     const frame = document.createElement("iframe");
-    frame.src = "./voc.html";
+    frame.src = "./voc.html?source=sample";
     frame.style.cssText = "width:1100px;height:900px;border:0";
     sandbox.appendChild(frame);
     try {

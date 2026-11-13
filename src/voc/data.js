@@ -38,7 +38,17 @@ export async function loadDataset(url, fetchFn = (...args) => fetch(...args)) {
   } catch {//catch 실행중 오류가 발생했을때 처리하는 코드
     throw new Error("문의 데이터를 불러오지 못했습니다. 네트워크 연결이나 서버 실행 여부를 확인해 주세요."); //Error만하면 영어에러 내뱉는데 New 붙이면 저렇게 에러 문구 지정해서 반환가능
   }
-  if (!response.ok) throw new Error(`문의 데이터를 불러오지 못했습니다. (HTTP ${response.status})`);//.ok 통신이 성공적으로 처리됐는지 알려주는 속성 HTTP 응답이 성공 범위인지 나타내는 속성 200번대 응답 true 404 반환하면 false response.status http 상태코드 알려줌 만약 서버 응답이 정상이 아니라면 몇번에러 코드 때문에 실패했는지(response.status) 적힌 새로운 한글 에러를 만들어서 바깥으로 던져라
+  // 중계기(tools/dev-proxy.py)는 실패 원인을 { error: "..." } 로 알려 준다. 있으면 함께 보여준다
+  let detail = "";
+  if (!response.ok) {
+    try {
+      const body = await response.json();
+      if (typeof body?.error === "string") detail = ` ${body.error}`;
+    } catch {
+      // 본문이 없거나 JSON이 아니면 상태 코드만 보여준다
+    }
+  }
+  if (!response.ok) throw new Error(`문의 데이터를 불러오지 못했습니다. (HTTP ${response.status})${detail}`);//.ok 통신이 성공적으로 처리됐는지 알려주는 속성 HTTP 응답이 성공 범위인지 나타내는 속성 200번대 응답 true 404 반환하면 false response.status http 상태코드 알려줌 만약 서버 응답이 정상이 아니라면 몇번에러 코드 때문에 실패했는지(response.status) 적힌 새로운 한글 에러를 만들어서 바깥으로 던져라
   //json 변환 
   let json;//json 변수하나 선언 let은 try블록 안에서 변수에 값을 새로 채워넣어야함
   try {
