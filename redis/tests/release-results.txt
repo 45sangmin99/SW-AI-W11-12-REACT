@@ -1,0 +1,9 @@
+Test project /Users/sangmin/Desktop/krafton-jungle/Week 11/SW-AI-W11-12-REDIS/build/cmake
+    Start 1: unit
+1/2 Test #1: unit .............................   Passed    1.18 sec
+    Start 2: integration
+2/2 Test #2: integration ......................   Passed   17.84 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =  19.02 sec

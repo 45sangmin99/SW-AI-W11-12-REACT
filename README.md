@@ -65,6 +65,33 @@ python3 tools/dev-proxy.py                                              # 터미
 - DBMS가 꺼져 있으면 화면에 원인이 보인다. DB 없이 보려면 `?source=sample`로 연다 (이때 상태는 이 브라우저에만 임시로 저장된다).
 - DBMS 자체의 설계와 검증은 [`dbms/readme.md`](dbms/readme.md)를 본다.
 
+### Mini Redis 캐시 (선택)
+
+중계기는 Mini Redis(`redis/`, C++20 HTTP 키-값 서버)가 켜져 있으면 읽기 두 주소를 캐시한다. **없어도 화면은 DBMS만으로 똑같이 동작한다.**
+
+```bash
+make -C redis && mkdir -p redis/data                                       # 처음 한 번 (clang++ 필요)
+./redis/build/mini-redis --port 6380 --aof-path redis/data/appendonly.aof  # 터미널 3: Redis (DBMS 서버, 중계기와 별개로 켠다)
+```
+
+```
+브라우저 ──▶ 중계기 ──GET──▶ Mini Redis(:6380) ──HIT──▶ 그대로 응답
+                │                    └─MISS─▶ Mini DBMS(:8080)에서 읽어 PUT(TTL) 후 응답
+                └─ POST /api/status: DBMS가 DURABLE 확인 → Redis의 이력 캐시 DEL → 201
+```
+
+| 키 | 담는 것 | TTL | 지우는 때 |
+| --- | --- | --- | --- |
+| `cache:voc:inquiries` | `GET /api/inquiries` 응답 전체 | 60초 | 문의는 이 중계기로 바뀌지 않아 TTL로만 갱신 |
+| `cache:voc:status-history` | `GET /api/status-history` 응답 전체 | 10초 | 상태 저장이 `DURABLE`로 확인된 직후, 저장 여부를 모를 때(`unknown`) |
+
+- **원본은 DBMS다.** Redis가 꺼져 있거나 오류여도 캐시 없이 DBMS에서 읽는다 (캐시를 읽다 실패해도 404나 오류가 아니라 MISS로 취급). 중계기를 켤 때 Redis 연결 여부를 한 줄로 알려 준다.
+- **DBMS 저장 성공 후 DEL**이다. 순서가 반대면 그 사이 다른 요청이 옛 이력을 다시 캐시에 채운다. 저장되지 않은 경우(`not_saved`)에는 지우지 않는다.
+- **TTL은 안전장치로 남긴다.** DEL이 실패하거나 지우는 사이에 옛 값이 채워져도 최대 10초 뒤에는 맞는 이력으로 돌아온다. 이 사이 짧게 옛 이력이 보일 수 있는 것이 한계다.
+- 값 한도 1MiB 안에 들어가는지 확인했다: 문의 3,000건 응답은 약 533KB, Redis로 보내는 본문(JSON 이스케이프 포함)은 약 600KB다. 문의가 지금의 1.7배 이상으로 늘면 한도를 넘어 PUT이 거부되고 그때는 캐시 없이 DBMS로만 읽는다.
+- Mini Redis는 HTTP로 `PUT/GET/DELETE /keys/{key}`만 제공한다. `INCR` 같은 원자적 명령이 없어서 이 중계기는 카운터를 Redis에 두지 않는다.
+- 이 서버의 설계·시험·측정은 [`redis/README.md`](redis/README.md)를 본다 (`make -C redis test`). 204 응답이 fsync 완료를 뜻하지 않는다는 점, 전원 차단은 검증하지 않았다는 점이 거기에 적혀 있다.
+
 ### DB 콘솔 (SQL을 직접 입력해 확인하기)
 
 저장된 데이터를 화면 없이 확인하거나 SQL을 직접 실행해 보는 터미널 도구다. `sqlite3` 같은 입력 → 실행 → 출력 반복 방식이고, 엔진 함수(`mdb_execute`)를 직접 호출한다.
@@ -99,6 +126,7 @@ mydb> .quit
 | **Phase 2** | 함수형 컴포넌트 · State · Hooks(`useState` `useEffect` `useMemo`) · **Batching(선택 과제)** | `src/mini-react.js` |
 | **테스트 페이지** | 고객 문의 이상 탐지 (R-01 ~ R-06, F-02 ~ F-07) | `voc.html`, `src/voc/` |
 | **DB 연결** | 문의 읽기 · 상태 이력 저장(F-08, R-14) · 개발용 중계기. 팀의 Mini DBMS(C)를 사용 | `dbms/`, `db/`, `tools/dev-proxy.py`, `src/voc/status-api.js` |
+| **Redis 캐시** | 중계기의 읽기 캐시(캐시 어사이드) + 상태 저장 후 무효화. 내가 만든 Mini Redis(C++20)를 사용 | `redis/`, `tools/dev-proxy.py` |
 | 테스트 | 직접 만든 러너 + 284개 (단위 + 기능 + `MutationObserver`) | `test.html`, `tests/` |
 
 Phase 2는 Phase 1의 `diff`·`patch`·`render`를 **그대로 재사용**한다. 상태가 바뀌면 새 Virtual DOM 생성 → Diff → 바뀐 부분만 Patch 순서로 처리된다.
@@ -505,6 +533,7 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 ├── scripts/generate-sample.cjs  샘플 생성기 (시드 고정, 시나리오 6개)
 ├── db/                     Mini DBMS 테이블 정의(*.schema)와 샘플 적재 스크립트(load_sample.py)
 ├── tools/dev-proxy.py      개발용 중계기: 화면 파일 제공 + 정해진 API 3개로 DBMS에 전달 (토큰은 서버 쪽에만)
+├── redis/                  Mini Redis (C++20, HTTP 키-값 서버, AOF). 중계기가 읽기 캐시로 사용 (선택)
 ├── dbms/                   Mini DBMS (C): SQL 처리기 · B+ 트리 · HTTP 서버. 팀 레포에서 가져옴, 자체 readme.md가 있다
 ├── src/
 │   ├── vdom.js             DOM → Virtual DOM 변환, cleanContainer, deepFreeze

@@ -1,0 +1,2 @@
+baseline requests=640000 batch=64 samples=10000 p50_ns=24.7344 p95_ns=31.25 p99_ns=33.8438 max_ns=611.328 starts=7 moved=381 checksum=40960000
+rehash requests=640000 batch=64 samples=10000 p50_ns=12.375 p95_ns=17.5781 p99_ns=20.8281 max_ns=104.812 starts=9 moved=1533 checksum=40960000

@@ -1,0 +1,64 @@
+$ curl -i -X PUT http://127.0.0.1:6380/keys/keyboard -H Content-Type: application/json --data-binary {"value":"keyboard","ttl_seconds":60}
+HTTP/1.1 204 No Content
+Content-Length: 0
+Content-Type: application/json
+Connection: keep-alive
+
+
+$ curl -i http://127.0.0.1:6380/keys/keyboard
+HTTP/1.1 200 OK
+Content-Length: 20
+Content-Type: application/json
+Connection: keep-alive
+
+{"value":"keyboard"}
+$ curl -i http://127.0.0.1:6380/keys/keyboard/ttl
+HTTP/1.1 200 OK
+Content-Length: 18
+Content-Type: application/json
+Connection: keep-alive
+
+{"ttl_seconds":60}
+$ curl -i -X DELETE http://127.0.0.1:6380/keys/keyboard
+HTTP/1.1 204 No Content
+Content-Length: 0
+Content-Type: application/json
+Connection: keep-alive
+
+
+$ curl -i http://127.0.0.1:6380/keys/keyboard
+HTTP/1.1 404 Not Found
+Content-Length: 25
+Content-Type: application/json
+Connection: keep-alive
+
+{"error":"key not found"}
+$ curl -i http://127.0.0.1:8080/products/1001?cache=off
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.9.6
+Date: Mon, 16 Nov 2026 12:10:22 GMT
+Content-Type: application/json
+Content-Length: 45
+X-Data-Source: origin
+
+{"id":"1001","name":"Keyboard","price":59000}
+$ curl -i http://127.0.0.1:8080/products/1001?cache=on
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.9.6
+Date: Mon, 16 Nov 2026 12:10:22 GMT
+Content-Type: application/json
+Content-Length: 45
+X-Data-Source: origin
+
+{"id":"1001","name":"Keyboard","price":59000}
+$ curl -i http://127.0.0.1:8080/products/1001?cache=on
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.9.6
+Date: Mon, 16 Nov 2026 12:10:22 GMT
+Content-Type: application/json
+Content-Length: 45
+X-Data-Source: redis
+
+{"id":"1001","name":"Keyboard","price":59000}
+GET /stats
+{"origin":2,"hit":1,"miss":1,"error":0}

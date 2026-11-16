@@ -6,6 +6,13 @@
   - 토큰을 브라우저 코드에 넣으면 누구나 볼 수 있으므로, 토큰은 이 프로그램(서버 쪽)에만 둔다.
   - 화면 파일과 API를 같은 주소에서 제공하므로 CORS 문제가 생기지 않는다.
 
+Mini Redis(선택)
+  - 읽기 두 주소는 Redis를 먼저 본다. 있으면 그대로 돌려주고(HIT), 없으면 DBMS에서 읽어 TTL을 걸어 저장한다(MISS).
+  - 원본은 언제나 DBMS다. Redis가 꺼져 있거나 오류여도 DBMS로 읽는다 (캐시는 없어도 되는 것).
+  - 상태 저장이 DURABLE로 확인된 뒤에만 신호 상태 이력 캐시를 지운다 (반대 순서면 옛 데이터가 다시 캐시된다).
+    저장 여부를 알 수 없을 때(unknown)도 지운다. 저장됐을 수 있기 때문이다.
+  - TTL은 안전장치다. 지우기에 실패하거나 지우는 사이에 옛 값이 채워져도 TTL이 지나면 맞는 값으로 돌아온다.
+
 열어 두는 주소는 아래 셋뿐이다. 브라우저는 SQL을 보낼 수 없다.
   GET  /api/inquiries       문의 전체          -> { meta, inquiries: [...] }
   GET  /api/status-history  신호 상태 이력     -> { history: { 신호ID: [{ status, at }, ...] } }
@@ -24,12 +31,15 @@
   1) python3 db/load_sample.py                      # DB 데이터 폴더 만들기 (처음 한 번)
   2) export MINIDB_TOKEN='아무 비밀 문자열'
   3) ./dbms/reliable/build/mini-db-server --data-dir db/data --port 8080     # 터미널 1
-  4) python3 tools/dev-proxy.py                                              # 터미널 2
-  5) 브라우저에서 http://localhost:8001/voc.html
+  4) make -C redis && mkdir -p redis/data
+     ./redis/build/mini-redis --port 6380 --aof-path redis/data/appendonly.aof   # 터미널 2 (선택)
+  5) python3 tools/dev-proxy.py                                              # 터미널 3
+  6) 브라우저에서 http://localhost:8001/voc.html
 
 개발용이라 127.0.0.1에서만 받는다. 외부에 열지 않는다.
 """
 import argparse
+import http.client
 import json
 import os
 import re
@@ -39,6 +49,7 @@ from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib import error, request
+from urllib.parse import quote as url_quote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = 10000  # DBMS가 한 번에 돌려주는 최대 행 수
@@ -50,6 +61,11 @@ BLOCKED = ("/.git", "/dbms", "/db/data", "/tools")
 # 지금 DB에는 시연용으로 만든 샘플만 들어 있으므로 시연 데이터 표시를 켠다.
 # 실제 문의를 넣게 되면 false로 바꾼다 (화면 상단의 시연용 안내가 이 값을 따른다)
 META = {"generated": True, "source": "mini-dbms"}
+# Mini Redis 캐시 키 (cache:voc:... 구역 규칙)와 TTL(초)
+KEY_INQUIRIES = "cache:voc:inquiries"
+KEY_HISTORY = "cache:voc:status-history"
+TTL_INQUIRIES = 60  # 문의는 이 중계기로 바뀌지 않는다. TTL로만 갱신한다
+TTL_HISTORY = 10    # 상태 저장 때 지우지만, 지우기에 실패해도 오래 어긋나지 않게 짧게 둔다
 
 
 def load_statuses():
@@ -115,12 +131,52 @@ class Db:
             last = int(page[-1][0])
 
 
+class Cache:
+    """Mini Redis(HTTP)의 키-값 캐시. 어떤 실패도 예외로 올리지 않는다 (캐시가 없어도 DBMS로 동작해야 한다)"""
+
+    def __init__(self, url):
+        parts = urlsplit(url)
+        self.host, self.port = parts.hostname or "127.0.0.1", parts.port or 6380
+
+    def _call(self, method, key, body=None):
+        conn = http.client.HTTPConnection(self.host, self.port, timeout=2)
+        try:
+            conn.request(method, "/keys/" + url_quote(key, safe=""), body, {"Content-Type": "application/json"})
+            res = conn.getresponse()
+            return res.status, res.read()
+        finally:
+            conn.close()
+
+    def get(self, key):
+        """저장된 문자열을 돌려준다. 없거나 Redis에 문제가 있으면 None (둘 다 DBMS에서 읽으면 된다)"""
+        try:
+            status, raw = self._call("GET", key)
+            return json.loads(raw)["value"] if status == 200 else None
+        except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError):
+            return None
+
+    def put(self, key, text, ttl):
+        body = json.dumps({"value": text, "ttl_seconds": ttl}, ensure_ascii=False, separators=(",", ":"))
+        try:
+            self._call("PUT", key, body.encode("utf-8"))
+        except (OSError, http.client.HTTPException):
+            pass  # 저장 못 해도 이번 응답은 이미 DBMS에서 읽은 값이다
+
+    def delete(self, key):
+        try:
+            self._call("DELETE", key)
+            return True
+        except (OSError, http.client.HTTPException):
+            return False  # TTL이 지나면 사라진다
+
+
 def quote(value):
     return "'" + value.replace("'", "''") + "'"
 
 
 class Handler(SimpleHTTPRequestHandler):
     db = None
+    cache = None
     statuses = ()
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript", ".mjs": "text/javascript"}
 
@@ -168,17 +224,36 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             super().do_HEAD()
 
+    def send_cached(self, key, ttl, build):
+        """캐시 어사이드: Redis에 있으면 그대로, 없으면 build()로 DBMS에서 만들어 저장하고 돌려준다"""
+        text = self.cache.get(key)
+        if text is None:
+            text = json.dumps(build(), ensure_ascii=False, separators=(",", ":"))
+            self.cache.put(key, text, ttl)
+        body = text.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def get_inquiries(self):
-        columns = ("created_at", "category", "device", "app_version", "text")
-        rows = self.db.select_all(",".join(columns), "inquiries")
-        inquiries = [{"id": int(r[0]), **dict(zip(columns, r[1:]))} for r in rows]
-        self.send_json(200, {"meta": META, "inquiries": inquiries})
+        def build():
+            columns = ("created_at", "category", "device", "app_version", "text")
+            rows = self.db.select_all(",".join(columns), "inquiries")
+            inquiries = [{"id": int(r[0]), **dict(zip(columns, r[1:]))} for r in rows]
+            return {"meta": META, "inquiries": inquiries}
+
+        self.send_cached(KEY_INQUIRIES, TTL_INQUIRIES, build)
 
     def get_status_history(self):
-        history = {}
-        for _id, alert_id, status, at in self.db.select_all("alert_id,status,at", "alert_status_history"):
-            history.setdefault(alert_id, []).append({"status": status, "at": at})
-        self.send_json(200, {"history": history})
+        def build():
+            history = {}
+            for _id, alert_id, status, at in self.db.select_all("alert_id,status,at", "alert_status_history"):
+                history.setdefault(alert_id, []).append({"status": status, "at": at})
+            return {"history": history}
+
+        self.send_cached(KEY_HISTORY, TTL_HISTORY, build)
 
     # ---- 쓰기
     def do_POST(self):
@@ -217,12 +292,17 @@ class Handler(SimpleHTTPRequestHandler):
                     continue
                 break
         except DbError as e:
+            if e.maybe_saved:
+                self.cache.delete(KEY_HISTORY)  # 저장됐을 수 있으니 옛 캐시를 남기지 않는다
             self.send_json(503, {"error": str(e), "outcome": "unknown" if e.maybe_saved else "not_saved"})
             return
         if code == 200 and data.get("ok") and data.get("commit") == "DURABLE":
+            self.cache.delete(KEY_HISTORY)  # DBMS 저장이 확인된 뒤에 지운다 (반대 순서 금지)
             self.send_json(201, {"alertId": alert_id, "status": status, "at": at})
             return
         unknown = data.get("commit") == "UNKNOWN" or bool(data.get("recovery_required"))
+        if unknown:
+            self.cache.delete(KEY_HISTORY)
         message = (data.get("error") or {}).get("message", f"HTTP {code}")
         if code == 409:
             self.send_json(409, {"error": "다른 변경과 충돌해 저장하지 못했습니다. 다시 시도해 주세요.", "outcome": "not_saved"})
@@ -234,6 +314,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--port", type=int, default=8001, help="이 중계기가 받을 포트 (기본 8001)")
     parser.add_argument("--db-url", default=os.environ.get("MINIDB_URL", "http://127.0.0.1:8080"), help="DBMS 서버 주소")
+    parser.add_argument("--redis-url", default=os.environ.get("MINIREDIS_URL", "http://127.0.0.1:6380"), help="Mini Redis 서버 주소 (꺼져 있으면 캐시 없이 동작)")
     args = parser.parse_args()
 
     token = os.environ.get("MINIDB_TOKEN")
@@ -241,13 +322,19 @@ def main():
         sys.exit("오류: 환경변수 MINIDB_TOKEN 이 필요합니다. DBMS 서버를 켤 때 쓴 것과 같은 값을 넣으세요")
 
     Handler.db = Db(args.db_url, token)
+    Handler.cache = Cache(args.redis_url)
     Handler.statuses = load_statuses()
     try:  # 켜져 있는지만 미리 알려 준다. 꺼져 있어도 시작은 한다
         request.urlopen(args.db_url.rstrip("/") + "/health", timeout=3).read()
         state = "연결됨"
     except (error.URLError, OSError):
         state = "연결 안 됨 (DBMS 서버를 먼저 켜세요)"
-    print(f"중계기: http://localhost:{args.port}/voc.html  |  DBMS {args.db_url}: {state}", flush=True)
+    try:
+        http.client.HTTPConnection(Handler.cache.host, Handler.cache.port, timeout=3).connect()
+        cache_state = "연결됨"
+    except OSError:
+        cache_state = "연결 안 됨 (캐시 없이 DBMS로만 동작)"
+    print(f"중계기: http://localhost:{args.port}/voc.html  |  DBMS {args.db_url}: {state}  |  Redis {args.redis_url}: {cache_state}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
 
 
