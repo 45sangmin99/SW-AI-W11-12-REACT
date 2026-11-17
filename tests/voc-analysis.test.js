@@ -538,6 +538,17 @@ describe("parseDataset / loadDataset (F-03)", () => {
   it("loadDataset: 성공", async () => {
     eq((await loadDataset("x", async () => ({ ok: true, json: async () => [good] }))).inquiries.length, 1);
   });
+  it("loadDataset: 중계기가 알려 준 출처(X-Data-Source)와 응답 시간을 meta.served로 돌려준다", async () => {
+    const withHeader = (value) => async () => ({ ok: true, headers: { get: (name) => (name === "X-Data-Source" ? value : null) }, json: async () => [good] });
+    const redis = await loadDataset("x", withHeader("redis"));
+    eq(redis.meta.served.from, "redis");
+    assert(Number.isInteger(redis.meta.served.ms) && redis.meta.served.ms >= 0, "응답 시간(ms)은 0 이상의 정수");
+    eq((await loadDataset("x", withHeader("dbms"))).meta.served.from, "dbms");
+  });
+  it("loadDataset: 출처 헤더가 없거나 모르는 값이면 표시하지 않는다 (샘플 JSON, 옛 중계기)", async () => {
+    eq((await loadDataset("x", async () => ({ ok: true, json: async () => [good] }))).meta.served, undefined);
+    eq((await loadDataset("x", async () => ({ ok: true, headers: { get: () => "other" }, json: async () => [good] }))).meta.served, undefined);
+  });
   it("loadDataset: 네트워크 실패·HTTP 오류·JSON 오류·형식 오류를 사람이 읽을 수 있는 메시지로", async () => {
     const msgs = [];
     for (const fake of [

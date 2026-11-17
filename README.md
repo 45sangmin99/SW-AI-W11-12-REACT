@@ -29,7 +29,7 @@ python3 -m http.server 8000
 | --- | --- |
 | `http://localhost:8000/voc.html?source=sample` | **고객 문의 이상 탐지 페이지** (Phase 1·2를 활용한 테스트 페이지). DB 없이 샘플 JSON으로 동작한다. `?source=sample` 없이 열면 DB에서 읽으므로 [DB 연결](#db와-연결해-실행)이 필요하다 |
 | `http://localhost:8000/index.html` | Phase 1 검증 페이지 (실제 영역 / 테스트 영역 / Patch / 뒤로·앞으로가기) |
-| `http://localhost:8000/test.html` | 단위·기능 테스트 (284개) |
+| `http://localhost:8000/test.html` | 단위·기능 테스트 (288개) |
 
 샘플 데이터(`data/inquiries.sample.json`, 3,000건)는 시드를 고정한 생성 스크립트로 만든다. 같은 시드면 항상 같은 파일이 나온다.
 
@@ -44,7 +44,7 @@ node scripts/generate-sample.cjs --count 5000     # 건수·시드·기준일 �
 
 ```bash
 make -C dbms                       # Mini DBMS 빌드 (C11 컴파일러, GNU Make 필요)
-python3 db/load_sample.py          # db/data/ 에 문의 3,000건 적재 (원본과 대조해 확인한다)
+python3 db/load_sample.py          # db/data/ 에 문의 1만 건 적재 (원본과 대조해 확인한다). 3,000건은 --sample data/inquiries.sample.json
 ```
 
 ```bash
@@ -65,12 +65,26 @@ python3 tools/dev-proxy.py                                              # 터미
 - DBMS가 꺼져 있으면 화면에 원인이 보인다. DB 없이 보려면 `?source=sample`로 연다 (이때 상태는 이 브라우저에만 임시로 저장된다).
 - DBMS 자체의 설계와 검증은 [`dbms/readme.md`](dbms/readme.md)를 본다.
 
+### 화면의 출처 표시와 프로젝트 지도
+
+- **출처 표시:** 화면 제목 옆 배지가 문의 데이터를 어디서 읽었는지와 응답 시간을 보여 준다. 처음 열면 `DBMS 직접 · 83ms`, 60초 안에 다시 열면 `Redis 캐시 · 20ms`처럼 바뀐다 (1만 건 기준, 이 맥에서 잰 한 번의 값). 중계기가 응답 헤더 `X-Data-Source`(`redis`/`dbms`)로 알려 주고, 헤더가 없는 샘플 모드(`?source=sample`)에서는 표시하지 않는다.
+- **프로젝트 지도:** `http://localhost:8001/home.html`(`home.html`)에 기획의도, 화면·중계기·Redis·DBMS의 연결 지도, 화면에서 하는 일과 뒤에서 일어나는 일의 표, 각 페이지로 바로 가는 링크가 있다.
+
 ### Mini Redis 캐시 (선택)
 
 중계기는 Mini Redis(`redis/`, C++20 HTTP 키-값 서버)가 켜져 있으면 읽기 두 주소를 캐시한다. **없어도 화면은 DBMS만으로 똑같이 동작한다.**
 
+**한 번에 켜기** (처음이면 빌드와 데이터 적재도 한다. Ctrl-C 하면 셋 다 꺼진다):
+
 ```bash
-make -C redis && mkdir -p redis/data                                       # 처음 한 번 (clang++ 필요)
+./tools/start-all.sh               # DBMS 서버 + Mini Redis + 중계기 → http://localhost:8001/voc.html
+NO_REDIS=1 ./tools/start-all.sh    # Redis 없이 (캐시 없는 DBMS 단독 동작 확인)
+```
+
+따로 켜려면 (clang++ 필요):
+
+```bash
+make -C redis && mkdir -p redis/data                                       # 처음 한 번
 ./redis/build/mini-redis --port 6380 --aof-path redis/data/appendonly.aof  # 터미널 3: Redis (DBMS 서버, 중계기와 별개로 켠다)
 ```
 
@@ -87,8 +101,10 @@ make -C redis && mkdir -p redis/data                                       # 처
 
 - **원본은 DBMS다.** Redis가 꺼져 있거나 오류여도 캐시 없이 DBMS에서 읽는다 (캐시를 읽다 실패해도 404나 오류가 아니라 MISS로 취급). 중계기를 켤 때 Redis 연결 여부를 한 줄로 알려 준다.
 - **DBMS 저장 성공 후 DEL**이다. 순서가 반대면 그 사이 다른 요청이 옛 이력을 다시 캐시에 채운다. 저장되지 않은 경우(`not_saved`)에는 지우지 않는다.
-- **TTL은 안전장치로 남긴다.** DEL이 실패하거나 지우는 사이에 옛 값이 채워져도 최대 10초 뒤에는 맞는 이력으로 돌아온다. 이 사이 짧게 옛 이력이 보일 수 있는 것이 한계다.
-- 값 한도 1MiB 안에 들어가는지 확인했다: 문의 3,000건 응답은 약 533KB, Redis로 보내는 본문(JSON 이스케이프 포함)은 약 600KB다. 문의가 지금의 1.7배 이상으로 늘면 한도를 넘어 PUT이 거부되고 그때는 캐시 없이 DBMS로만 읽는다.
+- **읽는 도중에 무효화되면 그 읽기는 캐시에 저장하지 않는다.** 저장 전의 옛 이력을 읽던 요청이 지운 뒤에 다시 채우는 일을 막는다 (중계기 안에서 키별 무효화 횟수를 세어 확인한다. 검증: 읽는 도중 무효화 → 옛 값이 다시 채워지지 않음).
+- **같은 키의 MISS가 동시에 와도 DBMS에는 한 번만 보낸다.** 먼저 잡은 요청이 읽고 나머지는 기다렸다가 캐시를 본다 (검증: 캐시를 지우고 동시 요청 10개 → DBMS 조회 1회).
+- **TTL은 안전장치로 남긴다.** DEL이 실패하면(Redis 응답 없음 등) 최대 10초 동안 옛 이력이 보일 수 있고, 그 뒤에는 맞는 이력으로 돌아온다. 이 보장은 중계기가 하나일 때의 것이다 (무효화 횟수를 프로세스 안에서 세므로 중계기를 여러 개 띄우면 적용되지 않는다).
+- **값 한도(1MiB)는 압축으로 해결했다.** 문의 1만 건 응답은 약 1.7MB라 그대로는 담을 수 없어서, 중계기가 zlib으로 압축해(base64 포함 약 196KB) 저장한다. 한도까지 약 5배 여유가 있다. 압축을 풀지 못하거나 형식 표시(`z:`)가 없는 값은 없는 것으로 보고 DBMS에서 다시 읽는다. 그래도 넘으면 PUT이 거부되고 캐시 없이 DBMS로만 읽는다.
 - Mini Redis는 HTTP로 `PUT/GET/DELETE /keys/{key}`만 제공한다. `INCR` 같은 원자적 명령이 없어서 이 중계기는 카운터를 Redis에 두지 않는다.
 - 이 서버의 설계·시험·측정은 [`redis/README.md`](redis/README.md)를 본다 (`make -C redis test`). 204 응답이 fsync 완료를 뜻하지 않는다는 점, 전원 차단은 검증하지 않았다는 점이 거기에 적혀 있다.
 
@@ -127,7 +143,7 @@ mydb> .quit
 | **테스트 페이지** | 고객 문의 이상 탐지 (R-01 ~ R-06, F-02 ~ F-07) | `voc.html`, `src/voc/` |
 | **DB 연결** | 문의 읽기 · 상태 이력 저장(F-08, R-14) · 개발용 중계기. 팀의 Mini DBMS(C)를 사용 | `dbms/`, `db/`, `tools/dev-proxy.py`, `src/voc/status-api.js` |
 | **Redis 캐시** | 중계기의 읽기 캐시(캐시 어사이드) + 상태 저장 후 무효화. 내가 만든 Mini Redis(C++20)를 사용 | `redis/`, `tools/dev-proxy.py` |
-| 테스트 | 직접 만든 러너 + 284개 (단위 + 기능 + `MutationObserver`) | `test.html`, `tests/` |
+| 테스트 | 직접 만든 러너 + 288개 (단위 + 기능 + `MutationObserver`) | `test.html`, `tests/` |
 
 Phase 2는 Phase 1의 `diff`·`patch`·`render`를 **그대로 재사용**한다. 상태가 바뀌면 새 Virtual DOM 생성 → Diff → 바뀐 부분만 Patch 순서로 처리된다.
 
@@ -446,7 +462,7 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 
 ## 테스트
 
-브라우저에서 `test.html`을 열면 **284개**가 실행된다. DB도 중계기도 없는 `python3 -m http.server`만으로 모두 통과한다. 외부 도구 없이 직접 만든 러너(`tests/runner.js`)를 쓴다.
+브라우저에서 `test.html`을 열면 **288개**가 실행된다. DB도 중계기도 없는 `python3 -m http.server`만으로 모두 통과한다. 외부 도구 없이 직접 만든 러너(`tests/runner.js`)를 쓴다.
 
 | 파일 | 검증 대상 | 개수 |
 | --- | --- | ---: |
@@ -529,10 +545,13 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 ├── css/
 │   ├── style.css           Phase 1 검증 페이지
 │   └── voc.css             문의 탐지 페이지
-├── data/inquiries.sample.json   공용 샘플 문의 3,000건 (생성 데이터)
+├── data/inquiries.sample.json   공용 샘플 문의 3,000건 (생성 데이터). 화면 테스트와 샘플 모드가 쓴다
+├── data/inquiries.large.json    DB용 문의 1만 건 (같은 생성기: --count 10000). load_sample.py의 기본 입력
+├── home.html               프로젝트 지도와 바로가기 (중계기 :8001/home.html)
 ├── scripts/generate-sample.cjs  샘플 생성기 (시드 고정, 시나리오 6개)
 ├── db/                     Mini DBMS 테이블 정의(*.schema)와 샘플 적재 스크립트(load_sample.py)
 ├── tools/dev-proxy.py      개발용 중계기: 화면 파일 제공 + 정해진 API 3개로 DBMS에 전달 (토큰은 서버 쪽에만)
+├── tools/start-all.sh      DBMS 서버 + Mini Redis + 중계기를 한 번에 켜고 Ctrl-C로 끄는 스크립트
 ├── redis/                  Mini Redis (C++20, HTTP 키-값 서버, AOF). 중계기가 읽기 캐시로 사용 (선택)
 ├── dbms/                   Mini DBMS (C): SQL 처리기 · B+ 트리 · HTTP 서버. 팀 레포에서 가져옴, 자체 readme.md가 있다
 ├── src/

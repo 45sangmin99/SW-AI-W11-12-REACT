@@ -120,6 +120,19 @@ describe("페이지 상태: 로딩 · 오류 · 빈 상태 (F-03)", () => {
   });
 });
 
+describe("데이터 출처 표시", () => {
+  it("중계기가 알려 준 출처와 응답 시간을 헤더에 보여 준다 (Redis 캐시 / DBMS 직접)", async () => {
+    for (const [from, label] of [["redis", "Redis 캐시"], ["dbms", "DBMS 직접"]]) {
+      const base = parseDataset(await loadSample());
+      const dataset = { ...base, meta: { ...base.meta, served: { from, ms: 7 } } };
+      await withApp(({ $ }) => eq(text($(`.badge-${from}`)), `${label} · 7ms`), { dataset });
+    }
+  });
+  it("출처 정보가 없으면(샘플 모드) 출처 표시가 없다", async () => {
+    await withApp(({ $ }) => assert(!$(".badge-redis") && !$(".badge-dbms")));
+  });
+});
+
 describe("첫 화면 (R-01 ~ R-05)", () => {
   it("헤더·요약·심각도순 가로 카드·첫 신호 상세(이유·차트·근거 문의)가 보인다", async () => {
     await withApp(({ $, $$, data }) => {

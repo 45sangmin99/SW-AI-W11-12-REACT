@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""샘플 문의 JSON(data/inquiries.sample.json)을 Mini DBMS 데이터 폴더로 만든다.
+"""문의 JSON을 Mini DBMS 데이터 폴더로 만든다. 기본은 1만 건(data/inquiries.large.json)이다.
 
 하는 일:
   1. 데이터 폴더를 새로 만들고 테이블 정의(*.schema)와 빈 CSV를 둔다
@@ -7,8 +7,11 @@
   3. 넣은 내용을 다시 읽어 원본과 한 건도 다르지 않은지 확인한다
 
 사용법 (저장소 루트에서, 먼저 `make -C dbms`로 빌드):
-  python3 db/load_sample.py                    # db/data/ 에 만든다
+  python3 db/load_sample.py                    # db/data/ 에 문의 1만 건을 만든다
+  python3 db/load_sample.py --sample data/inquiries.sample.json   # 공용 샘플 3,000건으로 만든다
   python3 db/load_sample.py --data-dir /경로   # 다른 곳에 만든다
+
+1만 건 파일은 같은 생성기로 만든다: node scripts/generate-sample.cjs --count 10000 --out data/inquiries.large.json
 
 이미 내용이 있는 폴더는 덮어쓰지 않고 멈춘다.
 문의 ID는 DBMS가 1부터 순서대로 발급한다 (샘플의 id와 같은 순서로 넣으므로 같은 번호가 된다).
@@ -83,7 +86,7 @@ def verify(data_dir, rows):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--data-dir", type=Path, default=HERE / "data", help="만들 DB 데이터 폴더 (기본: db/data)")
-    parser.add_argument("--sample", type=Path, default=ROOT / "data" / "inquiries.sample.json", help="문의 샘플 JSON")
+    parser.add_argument("--sample", type=Path, default=ROOT / "data" / "inquiries.large.json", help="문의 JSON (기본: 1만 건)")
     args = parser.parse_args()
 
     if not MINI_DB.exists():

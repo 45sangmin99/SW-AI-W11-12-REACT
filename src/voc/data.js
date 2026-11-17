@@ -33,6 +33,7 @@ export function parseDataset(json) {
 /** 서버에서 공용 샘플 JSON을 가져온다. 네트워크·HTTP·JSON 오류는 사람이 읽을 수 있는 메시지로 바꿔 던진다 async:비동기 함수로 선언(비동기:서버에서 데이터 가져오는 작업 시간걸리는 동안 프로그램이 무작정 기다리지않고 다른 작업을 진행 할 수 있게 하는 방식)url:데이터 가져올 주소 fetchFn 데이터 가져오는 기능 */
 export async function loadDataset(url, fetchFn = (...args) => fetch(...args)) {
   let response;//let 처음에는 값이 없고 새로운 값 할당할때
+  const startedAt = performance.now(); // 응답이 오기까지 걸린 시간 (화면의 출처 표시용)
   try {//try 실행해볼 코드
     response = await fetchFn(url);//await 비동기 작업이 끝날때 까지 해당 작업의 결과를 기다림
   } catch {//catch 실행중 오류가 발생했을때 처리하는 코드
@@ -56,7 +57,11 @@ export async function loadDataset(url, fetchFn = (...args) => fetch(...args)) {
   } catch {
     throw new Error("문의 데이터가 올바른 JSON이 아닙니다.");
   }
-  return parseDataset(json);
+  const result = parseDataset(json);
+  // 중계기는 어디서 읽었는지를 X-Data-Source 헤더(redis | dbms)로 알려 준다. 헤더가 없으면(샘플 JSON 등) 표시하지 않는다
+  const from = response.headers?.get?.("X-Data-Source");
+  if (from === "redis" || from === "dbms") result.meta = { ...result.meta, served: { from, ms: Math.round(performance.now() - startedAt) } };
+  return result;
 }
 
 /** 필터 선택지: 데이터에 실제로 있는 앱 버전 목록 만들기 (오름차순, "web"은 앱 버전이 아니므로 뺀다)... 전개연산자 map:배열의 각 요소를 원하는 형태로 변환하는 기능 set:중복된 값을 허용되지않는 자료구조 */

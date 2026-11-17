@@ -8,10 +8,14 @@
 
 Mini Redis(선택)
   - 읽기 두 주소는 Redis를 먼저 본다. 있으면 그대로 돌려주고(HIT), 없으면 DBMS에서 읽어 TTL을 걸어 저장한다(MISS).
+    응답 헤더 X-Data-Source(redis 또는 dbms)로 어디서 읽었는지 알려 준다 (화면의 출처 표시가 쓴다).
+    문의 1만 건 응답은 Redis 값 한도(1MiB)를 넘으므로 zlib으로 압축해서 저장한다.
   - 원본은 언제나 DBMS다. Redis가 꺼져 있거나 오류여도 DBMS로 읽는다 (캐시는 없어도 되는 것).
   - 상태 저장이 DURABLE로 확인된 뒤에만 신호 상태 이력 캐시를 지운다 (반대 순서면 옛 데이터가 다시 캐시된다).
     저장 여부를 알 수 없을 때(unknown)도 지운다. 저장됐을 수 있기 때문이다.
-  - TTL은 안전장치다. 지우기에 실패하거나 지우는 사이에 옛 값이 채워져도 TTL이 지나면 맞는 값으로 돌아온다.
+  - 읽는 도중에 무효화되면 그 읽기는 캐시에 저장하지 않는다 (옛 값을 다시 채우는 경쟁을 막는다).
+  - 같은 키의 MISS가 동시에 와도 DBMS에는 한 번만 보낸다.
+  - TTL은 안전장치다. 지우기에 실패해도 TTL이 지나면 맞는 값으로 돌아온다.
 
 열어 두는 주소는 아래 셋뿐이다. 브라우저는 SQL을 보낼 수 없다.
   GET  /api/inquiries       문의 전체          -> { meta, inquiries: [...] }
@@ -39,12 +43,15 @@ Mini Redis(선택)
 개발용이라 127.0.0.1에서만 받는다. 외부에 열지 않는다.
 """
 import argparse
+import base64
 import http.client
 import json
 import os
 import re
 import sys
+import threading
 import time
+import zlib
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -66,6 +73,9 @@ KEY_INQUIRIES = "cache:voc:inquiries"
 KEY_HISTORY = "cache:voc:status-history"
 TTL_INQUIRIES = 60  # 문의는 이 중계기로 바뀌지 않는다. TTL로만 갱신한다
 TTL_HISTORY = 10    # 상태 저장 때 지우지만, 지우기에 실패해도 오래 어긋나지 않게 짧게 둔다
+# Mini Redis는 값 하나가 1MiB까지다. 문의 1만 건 응답은 약 1.7MB라 그대로는 못 담으므로 압축해서 저장한다
+# (zlib + base64, 약 196KB). 맨 앞의 "z:"는 형식 표시이고, 이 표시가 없는 옛 값은 없는 것으로 본다
+CACHE_PREFIX = "z:"
 
 
 def load_statuses():
@@ -137,6 +147,9 @@ class Cache:
     def __init__(self, url):
         parts = urlsplit(url)
         self.host, self.port = parts.hostname or "127.0.0.1", parts.port or 6380
+        self._lock = threading.Lock()  # _versions, _flights 보호. 아래 fetch/invalidate 의 확인-저장, 올림-삭제도 이 락 안에서 한다
+        self._versions = {}  # 키별로 무효화한 횟수. 읽는 도중에 무효화됐는지 알아내는 용도
+        self._flights = {}   # 키별 락. 같은 키의 MISS를 한 번만 DBMS로 보내는 용도
 
     def _call(self, method, key, body=None):
         conn = http.client.HTTPConnection(self.host, self.port, timeout=2)
@@ -151,12 +164,16 @@ class Cache:
         """저장된 문자열을 돌려준다. 없거나 Redis에 문제가 있으면 None (둘 다 DBMS에서 읽으면 된다)"""
         try:
             status, raw = self._call("GET", key)
-            return json.loads(raw)["value"] if status == 200 else None
-        except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError):
+            value = json.loads(raw)["value"] if status == 200 else None
+            if not isinstance(value, str) or not value.startswith(CACHE_PREFIX):
+                return None
+            return zlib.decompress(base64.b64decode(value[len(CACHE_PREFIX):])).decode("utf-8")
+        except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError, zlib.error):
             return None
 
     def put(self, key, text, ttl):
-        body = json.dumps({"value": text, "ttl_seconds": ttl}, ensure_ascii=False, separators=(",", ":"))
+        packed = CACHE_PREFIX + base64.b64encode(zlib.compress(text.encode("utf-8"), 6)).decode("ascii")
+        body = json.dumps({"value": packed, "ttl_seconds": ttl}, ensure_ascii=False, separators=(",", ":"))
         try:
             self._call("PUT", key, body.encode("utf-8"))
         except (OSError, http.client.HTTPException):
@@ -168,6 +185,36 @@ class Cache:
             return True
         except (OSError, http.client.HTTPException):
             return False  # TTL이 지나면 사라진다
+
+    def fetch(self, key, ttl, build):
+        """캐시 어사이드. (본문, 출처)를 돌려준다. 출처는 "redis"(캐시에서) 또는 "dbms"(DBMS에서 읽음).
+        있으면 그대로, 없으면 build()로 DBMS에서 만들어 저장한다.
+
+        - 같은 키의 MISS가 동시에 와도 DBMS에는 한 번만 보낸다 (먼저 잡은 요청이 만들고, 나머지는 기다렸다가 캐시를 본다).
+        - 읽는 도중에 invalidate() 됐으면 저장하지 않는다. 저장 전의 옛 값을 지운 뒤에 다시 채우는 일을 막는다.
+        """
+        text = self.get(key)
+        if text is not None:
+            return text, "redis"
+        with self._lock:
+            flight = self._flights.setdefault(key, threading.Lock())
+        with flight:
+            text = self.get(key)  # 기다리는 사이 다른 요청이 채웠을 수 있다
+            if text is not None:
+                return text, "redis"
+            with self._lock:
+                version = self._versions.get(key, 0)
+            text = json.dumps(build(), ensure_ascii=False, separators=(",", ":"))
+            with self._lock:  # 확인과 저장 사이에 invalidate()가 끼어들지 못하게 같은 락 안에서 한다
+                if self._versions.get(key, 0) == version:
+                    self.put(key, text, ttl)
+            return text, "dbms"
+
+    def invalidate(self, key):
+        """무효화: 읽고 있는 요청이 옛 값을 다시 저장하지 못하게 표시한 뒤 지운다"""
+        with self._lock:
+            self._versions[key] = self._versions.get(key, 0) + 1
+            return self.delete(key)
 
 
 def quote(value):
@@ -225,13 +272,10 @@ class Handler(SimpleHTTPRequestHandler):
             super().do_HEAD()
 
     def send_cached(self, key, ttl, build):
-        """캐시 어사이드: Redis에 있으면 그대로, 없으면 build()로 DBMS에서 만들어 저장하고 돌려준다"""
-        text = self.cache.get(key)
-        if text is None:
-            text = json.dumps(build(), ensure_ascii=False, separators=(",", ":"))
-            self.cache.put(key, text, ttl)
+        text, source = self.cache.fetch(key, ttl, build)
         body = text.encode("utf-8")
         self.send_response(200)
+        self.send_header("X-Data-Source", source)  # 화면이 "Redis 캐시 / DBMS 직접"을 표시하는 데 쓴다
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -293,16 +337,16 @@ class Handler(SimpleHTTPRequestHandler):
                 break
         except DbError as e:
             if e.maybe_saved:
-                self.cache.delete(KEY_HISTORY)  # 저장됐을 수 있으니 옛 캐시를 남기지 않는다
+                self.cache.invalidate(KEY_HISTORY)  # 저장됐을 수 있으니 옛 캐시를 남기지 않는다
             self.send_json(503, {"error": str(e), "outcome": "unknown" if e.maybe_saved else "not_saved"})
             return
         if code == 200 and data.get("ok") and data.get("commit") == "DURABLE":
-            self.cache.delete(KEY_HISTORY)  # DBMS 저장이 확인된 뒤에 지운다 (반대 순서 금지)
+            self.cache.invalidate(KEY_HISTORY)  # DBMS 저장이 확인된 뒤에 지운다 (반대 순서 금지)
             self.send_json(201, {"alertId": alert_id, "status": status, "at": at})
             return
         unknown = data.get("commit") == "UNKNOWN" or bool(data.get("recovery_required"))
         if unknown:
-            self.cache.delete(KEY_HISTORY)
+            self.cache.invalidate(KEY_HISTORY)
         message = (data.get("error") or {}).get("message", f"HTTP {code}")
         if code == 409:
             self.send_json(409, {"error": "다른 변경과 충돌해 저장하지 못했습니다. 다시 시도해 주세요.", "outcome": "not_saved"})

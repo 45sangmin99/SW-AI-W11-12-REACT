@@ -129,7 +129,7 @@ export function App({ dataUrl = "data/inquiries.sample.json", load = loadDataset
   return h(
     "div",
     { class: "app" },
-    h(Header, { isGenerated: meta.generated === true }),
+    h(Header, { isGenerated: meta.generated === true, served: meta.served }),
     h(FilterBar, {
       query, period, category, device, appVersion, appVersions, statusFilter,
       onQuery: changeFilter(setQuery), onPeriod: changeFilter(setPeriod), onCategory: changeFilter(setCategory),

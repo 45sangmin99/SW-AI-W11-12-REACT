@@ -37,13 +37,18 @@ export function StatusView({ status, message }) {
 }
 
 // ---------------------------------------------------------------- ① Header
-export function Header({ isGenerated }) {
+const SERVED_LABEL = { redis: "Redis 캐시", dbms: "DBMS 직접" };
+
+export function Header({ isGenerated, served }) {
   return h(
     "header",
     { class: "app-header" },
     h("h1", null, "OBJECT NOTE 고객 문의 이상 탐지"),
     isGenerated
       ? h("span", { class: "badge", title: "가상의 회사 OBJECT NOTE의 시연용 데이터입니다. 실제 고객 문의가 아닙니다." }, "생성 데이터")
+      : null,
+    served && SERVED_LABEL[served.from]
+      ? h("span", { class: `badge badge-${served.from}`, title: "문의 데이터를 어디서 읽었는지와 응답 시간입니다. 처음에는 DBMS, 다시 열면 Redis 캐시(60초)에서 읽습니다." }, `${SERVED_LABEL[served.from]} · ${served.ms}ms`)
       : null,
     h("span", { class: "note" }, "시간은 UTC 기준"),
   );
