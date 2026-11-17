@@ -70,7 +70,7 @@ SQL 입력 (server.c · console.c · cli.c)
 ## 5. 둘을 같이 쓸 때 (VOC 프로젝트)
 
 ```
-브라우저 ──▶ 중계기(tools/dev-proxy.py) ──▶ Mini Redis(캐시)   없으면 ↘ Mini DBMS(원본)
+브라우저 ──▶ VOC 서비스(tools/voc-service.mjs) ──▶ Mini Redis(캐시)   없으면 ↘ Mini DBMS(원본)
                                           상태 저장은 DBMS가 DURABLE을 확인한 뒤에 Redis 캐시를 지운다
 ```
 
@@ -85,7 +85,7 @@ SQL 입력 (server.c · console.c · cli.c)
 세 프로젝트(Mini React · Mini Redis · Mini DBMS)를 이렇게 연결했다.
 
 ```
-브라우저 (Mini React 화면) ──▶ 중계기 ──① 먼저 확인──▶ Mini Redis   (빠르게)
+브라우저 (Mini React 화면) ──▶ VOC 서비스 ──① 먼저 확인──▶ Mini Redis   (빠르게)
                               │
                               └──② 없으면 읽기 / 상태 저장──▶ Mini DBMS (믿을 수 있게)
 
@@ -95,9 +95,9 @@ SQL 입력 (server.c · console.c · cli.c)
 
 | 구성 | 맡은 일 | 이 프로젝트에서 |
 |---|---|---|
-| **Mini React** | 화면. 가상 DOM을 비교(diff)해 바뀐 곳만 갱신(patch) | 필터, 이상 신호 카드, 근거 문의, 진행 현황. 신호 탐지 계산은 브라우저에서 |
+| **Mini React** | 화면. 가상 DOM을 비교(diff)해 바뀐 곳만 갱신(patch) | 필터, 이상 신호 카드, 근거 문의, 진행 현황. 조건을 서버에 보내고 계산된 결과만 받아 그림 (샘플 모드는 브라우저에서 같은 탐지 코드로 계산) |
 | **Mini Redis** | 빠르게 읽기 | 문의·상태 이력 응답을 메모리에 보관 (문의 60초, 이력 10초 만료) |
 | **Mini DBMS** | 안전하게 저장 | 문의 1만 건과 신호 상태 이력의 원본. 저장이 확인돼야 화면에 반영 |
-| 중계기 (`tools/dev-proxy.py`) | 셋을 잇는 길 | 토큰은 여기에만, 열린 주소는 3개뿐, 캐시를 먼저 보고 없으면 DBMS |
+| VOC 서비스 (`tools/voc-service.mjs`, Node) | 셋을 잇는 길 + 계산 | 필터·탐지·집계·근거 페이지를 서버에서 계산, 토큰은 여기에만, 캐시를 먼저 보고 없으면 DBMS |
 
 Redis가 꺼져도 DBMS로 정상 동작한다. 원본은 항상 DBMS다. 직접 열어 볼 수 있는 지도 페이지는 `home.html`이다 (`./tools/start-all.sh` 실행 후 `http://localhost:8001/home.html`).

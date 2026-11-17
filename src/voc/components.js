@@ -39,7 +39,7 @@ export function StatusView({ status, message }) {
 // ---------------------------------------------------------------- ① Header
 const SERVED_LABEL = { redis: "Redis 캐시", dbms: "DBMS 직접" };
 
-export function Header({ isGenerated, served }) {
+export function Header({ isGenerated, served, refreshSeconds = 0 }) {
   return h(
     "header",
     { class: "app-header" },
@@ -50,6 +50,7 @@ export function Header({ isGenerated, served }) {
     served && SERVED_LABEL[served.from]
       ? h("span", { class: `badge badge-${served.from}`, title: "문의 데이터를 어디서 읽었는지와 응답 시간입니다. 처음에는 DBMS, 다시 열면 Redis 캐시(60초)에서 읽습니다." }, `${SERVED_LABEL[served.from]} · ${served.ms}ms`)
       : null,
+    refreshSeconds > 0 ? h("span", { class: "note", title: "새로 접수된 문의가 있으면 이 간격마다 건수와 신호가 바뀝니다" }, `${refreshSeconds}초마다 자동 갱신`) : null,
     h("span", { class: "note" }, "시간은 UTC 기준"),
   );
 }
@@ -74,7 +75,7 @@ export function FilterBar({ query, period, category, device, appVersion, appVers
 }
 
 // ---------------------------------------------------------------- ③ SummaryCard (F-05)
-export function SummaryCard({ summary, status, message }) {
+export function SummaryCard({ summary, alertCounts, status, message }) {
   if (status !== "ready") return h("section", { class: "summary" }, h(StatusView, { status, message }));
   if (summary.count === 0) return h("section", { class: "summary" }, h(StatusView, { status: "empty", message: "조건에 맞는 문의가 없습니다" }));
   return h(
@@ -83,6 +84,19 @@ export function SummaryCard({ summary, status, message }) {
     h("span", { class: "summary-item" }, "문의 ", h("strong", null, `${summary.count.toLocaleString("ko-KR")}건`)),
     h("span", { class: "summary-sep" }, "·"),
     h("span", { class: "summary-item" }, "최다 유형 ", h("strong", null, summary.topCategory), ` (${summary.topCount.toLocaleString("ko-KR")}건)`),
+    // 미해결 신호: 지금 조건에서 감지된 신호 중 현재 상태가 "해결"이 아닌 것. 상태를 "해결"로 바꾸면 줄어든다 (문의 건수는 그대로다)
+    alertCounts
+      ? [
+          h("span", { class: "summary-sep" }, "·"),
+          h(
+            "span",
+            { class: "summary-item summary-open", title: `지금 조건에서 감지된 이상 신호 ${alertCounts.all}개 중 상태가 "해결"이 아닌 신호입니다` },
+            "미해결 신호 ",
+            h("strong", null, `${alertCounts.unresolved.toLocaleString("ko-KR")}개`),
+            ` (전체 ${alertCounts.all.toLocaleString("ko-KR")}개)`,
+          ),
+        ]
+      : null,
   );
 }
 

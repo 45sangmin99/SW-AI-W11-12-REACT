@@ -29,7 +29,7 @@ python3 -m http.server 8000
 | --- | --- |
 | `http://localhost:8000/voc.html?source=sample` | **고객 문의 이상 탐지 페이지** (Phase 1·2를 활용한 테스트 페이지). DB 없이 샘플 JSON으로 동작한다. `?source=sample` 없이 열면 DB에서 읽으므로 [DB 연결](#db와-연결해-실행)이 필요하다 |
 | `http://localhost:8000/index.html` | Phase 1 검증 페이지 (실제 영역 / 테스트 영역 / Patch / 뒤로·앞으로가기) |
-| `http://localhost:8000/test.html` | 단위·기능 테스트 (288개) |
+| `http://localhost:8000/test.html` | 단위·기능 테스트 (316개) |
 
 샘플 데이터(`data/inquiries.sample.json`, 3,000건)는 시드를 고정한 생성 스크립트로 만든다. 같은 시드면 항상 같은 파일이 나온다.
 
@@ -40,44 +40,98 @@ node scripts/generate-sample.cjs --count 5000     # 건수·시드·기준일 �
 
 ## DB와 연결해 실행
 
-화면의 문의를 Mini DBMS에서 읽고 상태 변경을 DB에 저장하려면, DBMS 서버와 중계기를 각각 터미널에 켠다. 처음 한 번은 빌드와 데이터 적재를 한다.
+화면의 문의를 Mini DBMS에서 읽고 상태 변경을 DB에 저장하려면 **DBMS 서버와 VOC 서비스**(Node)를 켠다. 필요한 것: Node 18 이상, C 컴파일러, GNU Make, python3 (데이터 적재).
 
 ```bash
-make -C dbms                       # Mini DBMS 빌드 (C11 컴파일러, GNU Make 필요)
+./tools/start-all.sh               # DBMS 서버 + Mini Redis + VOC 서비스를 한 번에 켠다 (처음이면 빌드와 데이터 적재도 한다). Ctrl-C로 모두 끈다
+```
+
+따로 하려면:
+
+```bash
+make -C dbms                       # Mini DBMS 빌드
 python3 db/load_sample.py          # db/data/ 에 문의 1만 건 적재 (원본과 대조해 확인한다). 3,000건은 --sample data/inquiries.sample.json
+export MINIDB_TOKEN='아무_비밀_문자열'   # DBMS 서버와 서비스에 같은 값을 쓴다 (터미널마다 export)
+./dbms/reliable/build/mini-db-server --data-dir db/data --port 8080     # 터미널 1: DBMS 서버
+node tools/voc-service.mjs                                              # 터미널 2: VOC 서비스 (Mini Redis는 아래 절)
 ```
+
+그다음 `http://localhost:8001/voc.html`을 연다 (프로젝트 지도: `http://localhost:8001/home.html`).
+
+```
+브라우저(voc.html) ──/api/v1/*──▶ VOC 서비스(tools/voc-service.mjs :8001) ──SQL + Bearer 토큰──▶ Mini DBMS(:8080)
+                                       └──────HTTP 캐시────────────────▶ Mini Redis(:6380, 선택)
+```
+
+- **계산은 서버가 한다 (Step 4).** 화면은 문의 전체를 받지 않는다. 필터(기간·유형·기기·앱 버전·검색어)를 보내면 서비스가 DBMS의 문의를 읽어 탐지·집계하고, 요약·신호 카드·선택한 신호의 상세(근거 문의 한 페이지)만 돌려준다. **탐지 코드는 브라우저 샘플 모드와 같은 `src/voc/analysis.js` 한 벌**이고, 응답 모양을 만드는 `src/voc/query.js`도 둘이 함께 쓴다 (그래서 Node가 필요하다).
+- **왜 서비스가 있나**: DBMS 서버는 토큰이 있어야 쓸 수 있고 CORS 헤더가 없어서 브라우저가 직접 부를 수 없다. 토큰을 화면 코드에 넣으면 누구나 볼 수 있으므로 서버 쪽에만 둔다. 화면 파일도 서비스가 같은 주소에서 내보내서 CORS 문제가 없다. 127.0.0.1에서만 받는 개발용이고, 서비스는 **한 인스턴스만** 지원한다 (두 번째 실행은 잠금 파일로 거부한다).
+- **열려 있는 주소** (브라우저는 SQL을 보낼 수 없다). 조회 조건은 모두 `period` `category` `device` `appVersion` `query`다. 조회 응답의 `dataSource`는 `redis` 또는 `dbms`다.
+
+| 주소 | 내용 |
+| --- | --- |
+| `GET /api/v1/overview` | 문의 건수, 최다 유형, 앱 버전 목록 |
+| `GET /api/v1/alerts` | 이상 신호 카드 목록 (`status` `page` `pageSize` 추가, 카드마다 `currentStatus`). 응답의 `counts`는 상태 필터 전의 신호 수(`all`)와 미해결 신호 수(`unresolved`) |
+| `GET /api/v1/alerts/{id}` | 신호 상세: 이유, 차트, 근거 문의 한 페이지 (`evidencePage`) |
+| `GET /api/v1/alerts/{id}/status-history` | 진행 상태 이력 |
+| `POST /api/v1/alerts/{id}/status` | 상태 추가 `{ status }` → 201 `{ alertId, status, at }` |
+| `POST /api/v1/admin/invalidate` | 문의를 다시 적재한 뒤 캐시를 비운다 (헤더 `X-Admin-Token`에 `MINIDB_TOKEN`) |
+
+  잘못된 조건은 400, 없는 신호는 404, DBMS에 닿지 못하면 503이다. 조건에 맞는 신호가 없으면 빈 목록이다.
+- **미해결 신호 수.** 요약에 `미해결 신호 N개 (전체 M개)`가 보인다. 지금 조건에서 감지된 신호 중 현재 상태가 `해결`이 아닌 것의 수이고, 상태를 `해결`로 바꾸면 줄어들고 다른 상태로 바꾸면 다시 는다. 진행 현황 필터를 바꿔도 숫자는 그대로다. **문의 건수("문의 N건")는 상태와 무관하다** (문의는 이미 접수된 사실이다).
+- **저장이 확인된 뒤에만 화면에 반영한다.** 저장 중에는 버튼이 잠긴다. 결과는 세 가지로 구분한다: 저장됨 / **저장 안 됨**(상태 그대로, 다시 시도 가능) / **저장 여부 모름**(저장됐을 수 있어 자동으로 다시 보내지 않고, 새로고침해서 이력을 확인하라고 안내한다). 다른 변경과 충돌(409)한 경우만 서비스가 3번까지 다시 시도한다. 저장이 확인되면 화면은 목록과 이력을 서버에서 다시 받는다.
+- DBMS가 꺼져 있으면 화면에 원인이 보인다. DB 없이 보려면 `?source=sample`로 연다 (샘플 JSON을 읽어 브라우저에서 계산하고, 상태는 이 브라우저에만 임시로 저장된다).
+- 예전 중계기 `tools/dev-proxy.py`(`/api/inquiries` 등 세 경로)는 남겨 두었지만 화면은 더 이상 쓰지 않는다.
+- DBMS 자체의 설계와 검증은 [`dbms/readme.md`](dbms/readme.md)를 본다.
+
+### 새 문의가 들어오면: 자동 갱신과 접수 시연
+
+실제 서비스에서는 고객이 쓴 글을 **고객 쪽 시스템이 DBMS에 저장**하고, 이 화면은 그 DB에서 문의를 꺼내 이상 신호를 보여 준다. 유관부서가 보는 화면이라 **문의를 쓰는 폼은 두지 않았다.** 대신 아래 둘로 "DB에 새 문의가 올라오면 화면이 따라 바뀐다"를 보여 준다.
+
+- **화면은 10초마다 자동으로 다시 받는다** (통합 모드만). 제목 옆에 `10초마다 자동 갱신`이 보이고, 주소 뒤에 `?refresh=초`를 붙이면 간격을 바꾼다(`?refresh=0`은 끔). 탭이 가려져 있으면 건너뛴다. **바뀐 게 없으면 Redis 캐시가 답하고**(출처 배지 `Redis 캐시 · 약 5ms`), **새 문의가 있으면 DBMS에서 다시 읽고 계산한다**(`DBMS 직접 · 약 100ms`). 서버가 잠깐 꺼져도 다음 갱신 때 스스로 돌아온다.
+- **`tools/simulate-intake.py`는 고객 쪽 시스템의 대역이다.** DBMS에 문의를 넣고, 저장이 `DURABLE`로 확인되면 VOC 서비스에 캐시를 비우라고 알린다 (DBMS에는 "바뀌었다"고 알려 주는 기능이 없어서, 이 알림이 없으면 화면은 캐시가 만료되는 최대 60초 뒤에 새 문의를 본다).
+
+**터미널을 쓰지 않고 켜려면** 레포 폴더에서 파일을 **더블클릭**한다 (Finder에서 `.command` 파일을 열면 터미널이 열리고 서버가 켜진다. 준비되면 브라우저에서 화면이 자동으로 열린다):
+
+| 파일 | 하는 일 |
+| --- | --- |
+| `서버 켜기.command` | DBMS + Redis + VOC 서비스를 켠다. 이미 켜져 있으면 화면만 연다 |
+| `시연 켜기.command` | 위에 더해 접수 시연을 켠다: 시작할 때 '배송' 25건이 들어와 새 이상 신호가 생기고, 그 뒤 문의가 평균 30초에 1건씩 들어온다 |
+
+끄려면 그 터미널 창에서 Ctrl-C를 누르거나 창을 닫는다 (창을 닫아도 서버가 함께 꺼진다). 처음 열 때 macOS가 "확인되지 않은 개발자"라고 막으면 파일을 우클릭 → 열기를 한 번 하면 된다.
+
+**명령으로 켜려면** (터미널 하나로 끝난다):
 
 ```bash
-export MINIDB_TOKEN='아무_비밀_문자열'   # DBMS 서버와 중계기에 같은 값을 쓴다 (터미널마다 export)
-./dbms/reliable/build/mini-db-server --data-dir db/data --port 8080     # 터미널 1: DBMS 서버
-python3 tools/dev-proxy.py                                              # 터미널 2: 중계기
+SIMULATE=1 ./tools/start-all.sh                                    # DBMS + Redis + VOC 서비스 + 접수 시연. 문의가 평균 30초에 1건씩 들어온다
+SIMULATE=1 SIMULATE_ARGS="--burst 배송" ./tools/start-all.sh        # 시작할 때 '배송' 25건이 한꺼번에 들어와 새 이상 신호가 생긴다 (SIMULATE_ARGS에는 아래 옵션을 그대로 쓴다)
 ```
 
-그다음 `http://localhost:8001/voc.html`을 연다.
+`SIMULATE`는 실제 `db/data`에 문의를 추가하므로 **기본은 꺼져 있다.** 접수 로그는 `tail -f $TMPDIR/mini-react-logs/intake.log`로 본다. 접수 스크립트만 따로 켜려면 (서버는 이미 켜져 있어야 한다):
 
-```
-브라우저(voc.html) ──/api/*──▶ 중계기(tools/dev-proxy.py :8001) ──SQL + Bearer 토큰──▶ Mini DBMS(:8080)
+```bash
+python3 tools/simulate-intake.py                    # 평균 30초에 1건 (10~50초 사이로 들쭉날쭉). Ctrl-C로 멈춘다
+python3 tools/simulate-intake.py --burst 배송        # 시작할 때 '배송' 25건을 한꺼번에 넣어 '문의 급증' 신호를 만든다
+python3 tools/simulate-intake.py --burst 배송 --burst-device Android --burst-only   # 급증 + Android 쏠림을 만들고 끝낸다
+python3 tools/simulate-intake.py --count 5 --interval 10    # 10초마다 5건만
 ```
 
-- **왜 중계기가 있나**: DBMS 서버는 토큰이 있어야 쓸 수 있고 CORS 헤더가 없어서 브라우저가 직접 부를 수 없다. 토큰을 화면 코드에 넣으면 누구나 볼 수 있으므로 서버 쪽(중계기)에만 둔다. 화면 파일도 중계기가 같은 주소에서 내보내서 CORS 문제가 없다. 127.0.0.1에서만 받는 개발용이다.
-- **열려 있는 주소는 셋뿐이다**: `GET /api/inquiries`(문의), `GET /api/status-history`(상태 이력), `POST /api/status`(상태 추가). 브라우저는 SQL을 보낼 수 없다.
-- **저장이 확인된 뒤에만 화면에 반영한다.** 저장 중에는 버튼이 잠긴다. 결과는 세 가지로 구분한다: 저장됨 / **저장 안 됨**(상태 그대로, 다시 시도 가능) / **저장 여부 모름**(저장됐을 수 있어 자동으로 다시 보내지 않고, 새로고침해서 이력을 확인하라고 안내한다). 다른 변경과 충돌(409)한 경우만 중계기가 3번까지 다시 시도한다.
-- DBMS가 꺼져 있으면 화면에 원인이 보인다. DB 없이 보려면 `?source=sample`로 연다 (이때 상태는 이 브라우저에만 임시로 저장된다).
-- DBMS 자체의 설계와 검증은 [`dbms/readme.md`](dbms/readme.md)를 본다.
+  평소 접수는 일부러 드물게 했다(기본 평균 30초에 1건). 이 데이터는 14일에 1만 건, 평균 2분에 1건 꼴이라 시연에서는 그보다 조금 빠른 정도다. 새 문의는 DBMS에서 읽은 평소 문의 1,500건 중 하나를 골라 지금 시각으로 저장한다 (생성 데이터이며 실제 고객 문구가 아니다).
+  - 토큰은 환경변수 `MINIDB_TOKEN`, 없으면 `./tools/start-all.sh`가 남긴 파일(끌 때 지워진다)에서 읽는다.
+  - **실제 `db/data`에 문의가 추가된다.** 되돌리려면 서버를 끄고 `db/data`를 옮긴 뒤 `python3 db/load_sample.py`로 다시 적재한다. 접수 번호가 1만 건 다음 번호가 아니라 건너뛰는 것은 DBMS가 ID를 4096개씩 미리 예약하기 때문이다.
+  - 접수 시각은 "지금"(UTC)이다. 데이터가 10/27~11/9라서 `최근 24시간` 같은 기간 필터는 지금 시각 기준으로 바뀐다. `전체 기간`에서는 예전 신호가 그대로 보인다.
+  - 확인한 결과(복사본 DB, 화면을 2초 간격으로 갱신): 문의 10,003 → 10,004건(평소 접수 1건) → 10,030건(`배송`·Android 급증 25건)으로 바뀌고, 신호가 28개 → 31개가 되며 맨 위에 `문의 급증 배송 · 평소의 26.0배`가 나타났다. 출처 배지는 새 문의가 있던 갱신에서만 `DBMS 직접`이었다.
 
 ### 화면의 출처 표시와 프로젝트 지도
 
-- **출처 표시:** 화면 제목 옆 배지가 문의 데이터를 어디서 읽었는지와 응답 시간을 보여 준다. 처음 열면 `DBMS 직접 · 83ms`, 60초 안에 다시 열면 `Redis 캐시 · 20ms`처럼 바뀐다 (1만 건 기준, 이 맥에서 잰 한 번의 값). 중계기가 응답 헤더 `X-Data-Source`(`redis`/`dbms`)로 알려 주고, 헤더가 없는 샘플 모드(`?source=sample`)에서는 표시하지 않는다.
-- **프로젝트 지도:** `http://localhost:8001/home.html`(`home.html`)에 기획의도, 화면·중계기·Redis·DBMS의 연결 지도, 화면에서 하는 일과 뒤에서 일어나는 일의 표, 각 페이지로 바로 가는 링크가 있다.
+- **출처 표시:** 화면 제목 옆 배지가 문의 데이터를 어디서 읽었는지와 응답 시간을 보여 준다. 처음 열면 `DBMS 직접 · 83ms`, 60초 안에 다시 열면 `Redis 캐시 · 20ms`처럼 바뀐다 (1만 건 기준, 이 맥에서 잰 한 번의 값). 서비스가 응답의 `dataSource`(`redis`/`dbms`)로 알려 주고, 샘플 모드(`?source=sample`)에서는 표시하지 않는다.
+- **프로젝트 지도:** `http://localhost:8001/home.html`(`home.html`)에 기획의도, 화면·서비스·Redis·DBMS의 연결 지도, 화면에서 하는 일과 뒤에서 일어나는 일의 표, 각 페이지로 바로 가는 링크가 있다.
 
 ### Mini Redis 캐시 (선택)
 
-중계기는 Mini Redis(`redis/`, C++20 HTTP 키-값 서버)가 켜져 있으면 읽기 두 주소를 캐시한다. **없어도 화면은 DBMS만으로 똑같이 동작한다.**
-
-**한 번에 켜기** (처음이면 빌드와 데이터 적재도 한다. Ctrl-C 하면 셋 다 꺼진다):
+VOC 서비스는 Mini Redis(`redis/`, C++20 HTTP 키-값 서버)가 켜져 있으면 조회 응답을 캐시한다. **없어도 화면은 DBMS만으로 똑같이 동작한다.**
 
 ```bash
-./tools/start-all.sh               # DBMS 서버 + Mini Redis + 중계기 → http://localhost:8001/voc.html
+./tools/start-all.sh               # DBMS 서버 + Mini Redis + VOC 서비스 → http://localhost:8001/voc.html
 NO_REDIS=1 ./tools/start-all.sh    # Redis 없이 (캐시 없는 DBMS 단독 동작 확인)
 ```
 
@@ -85,27 +139,31 @@ NO_REDIS=1 ./tools/start-all.sh    # Redis 없이 (캐시 없는 DBMS 단독 동
 
 ```bash
 make -C redis && mkdir -p redis/data                                       # 처음 한 번
-./redis/build/mini-redis --port 6380 --aof-path redis/data/appendonly.aof  # 터미널 3: Redis (DBMS 서버, 중계기와 별개로 켠다)
+./redis/build/mini-redis --port 6380 --aof-path redis/data/appendonly.aof  # 터미널 3: Redis (DBMS 서버, 서비스와 별개로 켠다)
 ```
 
 ```
-브라우저 ──▶ 중계기 ──GET──▶ Mini Redis(:6380) ──HIT──▶ 그대로 응답
-                │                    └─MISS─▶ Mini DBMS(:8080)에서 읽어 PUT(TTL) 후 응답
-                └─ POST /api/status: DBMS가 DURABLE 확인 → Redis의 이력 캐시 DEL → 201
+브라우저 ──▶ 서비스 ──GET──▶ Mini Redis(:6380) ──HIT──▶ 그대로 응답
+                │                    └─MISS─▶ Mini DBMS(:8080)에서 읽고 계산해 PUT(TTL) 후 응답
+                └─ POST status: DBMS가 DURABLE 확인 → 상태 세대 증가 → Redis 옛 키 DEL → 201
 ```
 
-| 키 | 담는 것 | TTL | 지우는 때 |
+| 키 | 담는 것 | TTL | 바뀌는 때 |
 | --- | --- | --- | --- |
-| `cache:voc:inquiries` | `GET /api/inquiries` 응답 전체 | 60초 | 문의는 이 중계기로 바뀌지 않아 TTL로만 갱신 |
-| `cache:voc:status-history` | `GET /api/status-history` 응답 전체 | 10초 | 상태 저장이 `DURABLE`로 확인된 직후, 저장 여부를 모를 때(`unknown`) |
+| `cache:voc:v1:analysis:{문의 세대}:{sha256(종류·조건)}` | 요약 / 신호 카드 목록 / 신호 상세(근거 한 페이지). 조건마다 다른 키 | 60초 | 문의를 다시 적재하면(`admin/invalidate`) 세대가 올라가 옛 키는 조회되지 않고 TTL로 사라진다 |
+| `cache:voc:v1:statuses:{상태 세대}` | 모든 신호의 상태 이력 | 10초 | 상태 저장이 `DURABLE`로 확인된 직후, 저장 여부를 모를 때(`unknown`) |
 
-- **원본은 DBMS다.** Redis가 꺼져 있거나 오류여도 캐시 없이 DBMS에서 읽는다 (캐시를 읽다 실패해도 404나 오류가 아니라 MISS로 취급). 중계기를 켤 때 Redis 연결 여부를 한 줄로 알려 준다.
-- **DBMS 저장 성공 후 DEL**이다. 순서가 반대면 그 사이 다른 요청이 옛 이력을 다시 캐시에 채운다. 저장되지 않은 경우(`not_saved`)에는 지우지 않는다.
-- **읽는 도중에 무효화되면 그 읽기는 캐시에 저장하지 않는다.** 저장 전의 옛 이력을 읽던 요청이 지운 뒤에 다시 채우는 일을 막는다 (중계기 안에서 키별 무효화 횟수를 세어 확인한다. 검증: 읽는 도중 무효화 → 옛 값이 다시 채워지지 않음).
-- **같은 키의 MISS가 동시에 와도 DBMS에는 한 번만 보낸다.** 먼저 잡은 요청이 읽고 나머지는 기다렸다가 캐시를 본다 (검증: 캐시를 지우고 동시 요청 10개 → DBMS 조회 1회).
-- **TTL은 안전장치로 남긴다.** DEL이 실패하면(Redis 응답 없음 등) 최대 10초 동안 옛 이력이 보일 수 있고, 그 뒤에는 맞는 이력으로 돌아온다. 이 보장은 중계기가 하나일 때의 것이다 (무효화 횟수를 프로세스 안에서 세므로 중계기를 여러 개 띄우면 적용되지 않는다).
-- **값 한도(1MiB)는 압축으로 해결했다.** 문의 1만 건 응답은 약 1.7MB라 그대로는 담을 수 없어서, 중계기가 zlib으로 압축해(base64 포함 약 196KB) 저장한다. 한도까지 약 5배 여유가 있다. 압축을 풀지 못하거나 형식 표시(`z:`)가 없는 값은 없는 것으로 보고 DBMS에서 다시 읽는다. 그래도 넘으면 PUT이 거부되고 캐시 없이 DBMS로만 읽는다.
-- Mini Redis는 HTTP로 `PUT/GET/DELETE /keys/{key}`만 제공한다. `INCR` 같은 원자적 명령이 없어서 이 중계기는 카운터를 Redis에 두지 않는다.
+카드 목록은 상태를 빼고 캐시하고, 응답을 만들 때 최신 상태를 합친다. 그래서 상태를 바꿔도 분석 캐시는 그대로 쓴다. (정의서 초안은 신호마다 이력 키를 두자고 했지만, 목록과 상태 필터가 모든 신호의 상태를 한꺼번에 필요로 해서 이력 전체를 한 키로 두었다.)
+
+- **원본은 DBMS다.** Redis가 꺼져 있거나 오류여도 캐시 없이 DBMS에서 읽는다 (읽다 실패하거나, 키가 없거나, 형식이 다르거나, 압축을 풀지 못하면 모두 MISS로 취급). 서비스를 켤 때 Redis 연결 여부를 한 줄로 알려 준다.
+- **DBMS 저장 성공 후에 무효화한다.** 순서가 반대면 그 사이 다른 요청이 옛 이력을 다시 캐시에 채운다. 저장되지 않은 경우(`not_saved`)에는 지우지 않는다.
+- **읽는 도중에 무효화되면 그 읽기는 캐시에 저장하지 않는다.** 읽기를 시작할 때의 세대와 끝날 때의 세대를 비교한다 (이번 요청에는 돌려주되 Redis에는 넣지 않는다).
+- **같은 키의 MISS가 동시에 와도 DBMS에는 한 번만 보낸다.** 진행 중인 계산을 모두가 함께 기다린다 (검증: 새 조건으로 동시 요청 10개 → DBMS 읽기 1회).
+- **세대 번호에는 서비스를 켠 시각이 들어간다.** Redis는 재시작해도 키를 남기는데(AOF), 번호가 0부터 다시 시작하면 옛 키를 되살릴 수 있어서다.
+- **문의를 다시 적재했다면** `POST /api/v1/admin/invalidate`(헤더 `X-Admin-Token`에 `MINIDB_TOKEN`)로 캐시를 비운다. `db/load_sample.py`가 적재에 성공하면 같은 환경변수가 있을 때 자동으로 호출한다 (서비스가 꺼져 있으면 건너뛴다).
+- **TTL은 안전장치로 남긴다.** DEL이 실패하면(Redis 응답 없음 등) 최대 10초 동안 옛 이력이 보일 수 있고, 그 뒤에는 맞는 이력으로 돌아온다. 세대와 단일 비행은 서비스 프로세스 안에서 관리하므로 **서비스를 하나만** 띄운다는 전제다.
+- **값 한도(1MiB)는 압축으로 해결했다.** 서비스가 zlib으로 압축해(base64 포함) 저장하고, 900KB를 넘으면 캐시하지 않는다.
+- Mini Redis는 HTTP로 `PUT/GET/DELETE /keys/{key}`만 제공한다. `INCR` 같은 원자적 명령이 없어서 카운터는 Redis에 두지 않는다.
 - 이 서버의 설계·시험·측정은 [`redis/README.md`](redis/README.md)를 본다 (`make -C redis test`). 204 응답이 fsync 완료를 뜻하지 않는다는 점, 전원 차단은 검증하지 않았다는 점이 거기에 적혀 있다.
 
 ### DB 콘솔 (SQL을 직접 입력해 확인하기)
@@ -141,9 +199,9 @@ mydb> .quit
 | Phase 1 검증 페이지 | 실제 영역 + 테스트 영역 + Patch/뒤로가기/앞으로가기 | `index.html`, `src/main.js` |
 | **Phase 2** | 함수형 컴포넌트 · State · Hooks(`useState` `useEffect` `useMemo`) · **Batching(선택 과제)** | `src/mini-react.js` |
 | **테스트 페이지** | 고객 문의 이상 탐지 (R-01 ~ R-06, F-02 ~ F-07) | `voc.html`, `src/voc/` |
-| **DB 연결** | 문의 읽기 · 상태 이력 저장(F-08, R-14) · 개발용 중계기. 팀의 Mini DBMS(C)를 사용 | `dbms/`, `db/`, `tools/dev-proxy.py`, `src/voc/status-api.js` |
-| **Redis 캐시** | 중계기의 읽기 캐시(캐시 어사이드) + 상태 저장 후 무효화. 내가 만든 Mini Redis(C++20)를 사용 | `redis/`, `tools/dev-proxy.py` |
-| 테스트 | 직접 만든 러너 + 288개 (단위 + 기능 + `MutationObserver`) | `test.html`, `tests/` |
+| **DB 연결 · 서비스 API** | 문의 읽기 · 상태 이력 저장(F-08, R-14). 서버(Node)가 필터·탐지·집계·근거 페이지를 계산하는 `/api/v1`. 팀의 Mini DBMS(C)를 사용 | `dbms/`, `db/`, `tools/voc-service.mjs`, `src/voc/query.js`, `src/voc/service-api.js` |
+| **Redis 캐시** | 서비스의 응답 캐시(캐시 어사이드, 세대 번호 무효화, 단일 비행). 내가 만든 Mini Redis(C++20)를 사용 | `redis/`, `tools/voc-service.mjs` |
+| 테스트 | 직접 만든 러너 + 316개 (단위 + 기능 + `MutationObserver`) | `test.html`, `tests/` |
 
 Phase 2는 Phase 1의 `diff`·`patch`·`render`를 **그대로 재사용**한다. 상태가 바뀌면 새 Virtual DOM 생성 → Diff → 바뀐 부분만 Patch 순서로 처리된다.
 
@@ -157,7 +215,7 @@ Phase 2는 Phase 1의 `diff`·`patch`·`render`를 **그대로 재사용**한다
 ┌──────────────────────────────────────────────────────────────────────┐
 │ ① Header   OBJECT NOTE 고객 문의 이상 탐지               [생성 데이터] │
 │ ② FilterBar [검색] [기간] [유형] [기기] [앱 버전] [진행 현황] [초기화]  │
-│ ③ SummaryCard   문의 3,000건 · 최다 유형 사이즈·교환 (634건)           │
+│ ③ SummaryCard   문의 3,000건 · 최다 유형 사이즈·교환 (634건) · 미해결 신호 16개 │
 │ ④ SignalList (가로 카드, 심각도순)                                      │
 │ [문의 급증·높음] [유형 쏠림·높음] [기기·버전 쏠림·높음] [반복 문구·중간] …│
 │ ⑤ SignalDetail — 선택한 신호, 전체 너비                                 │
@@ -462,7 +520,7 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 
 ## 테스트
 
-브라우저에서 `test.html`을 열면 **288개**가 실행된다. DB도 중계기도 없는 `python3 -m http.server`만으로 모두 통과한다. 외부 도구 없이 직접 만든 러너(`tests/runner.js`)를 쓴다.
+브라우저에서 `test.html`을 열면 **316개**가 실행된다. DB도 중계기도 없는 `python3 -m http.server`만으로 모두 통과한다. 외부 도구 없이 직접 만든 러너(`tests/runner.js`)를 쓴다.
 
 | 파일 | 검증 대상 | 개수 |
 | --- | --- | ---: |
@@ -521,16 +579,14 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 
 ## 통합(Step 4)을 위한 연결 지점
 
-이 레포는 단독으로 동작하되, 합칠 때 바꾸는 곳을 최소로 두었다. 문의 읽기와 상태 저장은 이미 Mini DBMS에 연결했다(중계기 경유). 아래 표에서 "지금"은 연결해 둔 모습이고 "Step 4에서"는 남은 일이다.
+Step 4는 Step 4 요구사항 정의서의 결정(2026-11-17 확정, [`docs/step4-decisions.md`](docs/step4-decisions.md))에 따라 **단계로 나눠** 진행한다. 이 레포는 계속 단독으로 동작한다 (`?source=sample`).
 
-| 지금 | Step 4에서 (정의서 R-07, R-12, R-08) |
-| --- | --- |
-| `App`의 `load` prop이 중계기(`/api/inquiries`)에서 문의를 읽는다. `?source=sample`이면 샘플 JSON | 중계기를 문의 서비스 API로 교체. 서버가 집계 결과와 근거 문의 한 페이지만 보낸다 (U-15 endpoint 미정) |
-| 브라우저에서 필터·탐지·집계·페이지 나누기 (`src/voc/analysis.js`) | 문의 서비스 서버로 이동. **순수 함수라서 그대로 옮길 수 있다** |
-| `hourRange` · `detectAlerts`가 메모리의 전체 문의를 훑음 | DBMS의 `WHERE 필드 = 값` 조회 결과를 받아 서비스가 같은 계산을 한다 (R-11: DBMS는 GROUP BY·범위·LIKE 없음) |
-| 발생 건 ID가 `유형:범위:시작시각` 문자열이고, DB의 `alert_status_history.alert_id`에 그대로 저장한다 (가장 긴 ID 40바이트, 칸은 120바이트) | DBMS가 자동 부여한 `alert_id` (R-13)로 바꿀지, 새로 저장할 때 "같은 발생 건"을 알아보는 기준(U-28)은 그때 정한다 |
-| ⑥ 진행 현황: 상태 변경을 `alert_status_history`에 INSERT하고(`POST /api/status`), 시작할 때 이력을 읽는다(`GET /api/status-history`). 샘플 모드는 `App` 메모리에만 보관 | 문의 서비스 API를 거치게 한다 (R-14). **`App`은 `loadHistory`·`saveStatus` prop만 갈아 끼운다** |
-| ⑦ 성능 비교 패널 없음 | `PerfPanel`(O-03) 추가 |
+| 단계 | 내용 | 상태 |
+| --- | --- | --- |
+| **1. 서비스 API** | 중계기를 VOC 서비스(`tools/voc-service.mjs`, `/api/v1`)로 교체. 필터·탐지·집계·근거 페이지를 서버에서 계산하고, 화면은 결과만 받는다. 응답 캐시(세대 번호, 단일 비행), 한 인스턴스 강제, 재적재 때 캐시 비우기, 출처 표시 | **완료** (3,000건·1만 건에서 확인, 자동 갱신·접수 시연 포함, 테스트 316개) |
+| 2. alert 저장 | DBMS 자동 ID를 가진 `alert_occurrences`, 같은 발생 건의 중복 방지, 상태 이력이 그 ID를 참조. ID는 처음 필요할 때(상태 변경·상세) 만들고 `GET`은 쓰지 않는다 | 아직 (지금 ID는 `유형:범위:시작시각` 문자열) |
+| 3. 성능 패널 | `GET /api/v1/performance`, `PerfPanel`(O-03): 예열 10회 + 100회 순차 측정, p50·p95 | 아직 |
+| 4. 100만 건 (R-10) | 서비스가 DBMS를 ID 페이지로 읽어 서버에서 집계, 백그라운드 계산과 진행률. 생성기 시나리오와 탐지 임계값을 규모에 맞게 | 아직 (현재 탐지는 100만 건에서 약 100초 걸리고 급증·유형 쏠림이 나오지 않는다) |
 
 ---
 
@@ -550,8 +606,12 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 ├── home.html               프로젝트 지도와 바로가기 (중계기 :8001/home.html)
 ├── scripts/generate-sample.cjs  샘플 생성기 (시드 고정, 시나리오 6개)
 ├── db/                     Mini DBMS 테이블 정의(*.schema)와 샘플 적재 스크립트(load_sample.py)
-├── tools/dev-proxy.py      개발용 중계기: 화면 파일 제공 + 정해진 API 3개로 DBMS에 전달 (토큰은 서버 쪽에만)
-├── tools/start-all.sh      DBMS 서버 + Mini Redis + 중계기를 한 번에 켜고 Ctrl-C로 끄는 스크립트
+├── tools/voc-service.mjs   VOC 서비스(Node): 화면 파일 + /api/v1. DBMS에서 읽어 탐지·집계하고 Redis에 캐시 (토큰은 서버 쪽에만)
+├── tools/dev-proxy.py      예전 중계기 (/api/inquiries 등 세 경로). 화면은 더 이상 쓰지 않는다
+├── 서버 켜기.command · 시연 켜기.command   더블클릭으로 서버(와 접수 시연)를 켜는 파일 (macOS)
+├── tools/simulate-intake.py 시연용 접수 스크립트: 고객 쪽 시스템 대역. DBMS에 문의를 넣고 서비스 캐시를 비운다
+├── tools/start-all.sh      DBMS 서버 + Mini Redis + VOC 서비스를 한 번에 켜고 Ctrl-C로 끄는 스크립트
+├── package.json            Node가 src/voc/*.js 를 ES 모듈로 읽게 하는 표시 (외부 패키지 없음)
 ├── redis/                  Mini Redis (C++20, HTTP 키-값 서버, AOF). 중계기가 읽기 캐시로 사용 (선택)
 ├── dbms/                   Mini DBMS (C): SQL 처리기 · B+ 트리 · HTTP 서버. 팀 레포에서 가져옴, 자체 readme.md가 있다
 ├── src/
@@ -569,6 +629,8 @@ DOM 노드를 바꾸면 브라우저는 스타일을 다시 계산하고, 영향
 │       ├── status.js       진행 상태 규칙 (현재 상태, 이력 추가, 변경 가능 여부)
 │       ├── data.js         데이터 불러오기·검증
 │       ├── status-api.js   상태 이력 불러오기·저장 (저장 결과를 구분)
+│       ├── query.js        서비스 API 응답 모양 만들기·조건 검증 (순수 함수, 브라우저와 Node 서비스가 함께 씀)
+│       ├── service-api.js  서비스 API(/api/v1) 클라이언트
 │       ├── components.js   순수 컴포넌트 (Header … SignalDetail)
 │       ├── app.js          루트 App (상태·Hook은 여기만)
 │       └── main.js         진입점

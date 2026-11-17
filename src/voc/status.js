@@ -5,6 +5,10 @@ import { CONFIG } from "./config.js";
 
 export const STATUSES = CONFIG.STATUSES;
 export const DEFAULT_STATUS = CONFIG.STATUSES[0];
+/** 마지막 단계(해결)가 끝난 상태다. 이것이 아닌 신호는 아직 처리 중인 "미해결" 신호다 */
+export const RESOLVED_STATUS = CONFIG.STATUSES[CONFIG.STATUSES.length - 1];
+/** 이 상태가 아직 해결되지 않았는가 */
+export const isUnresolved = (status) => status !== RESOLVED_STATUS;
 
 /** 현재 상태 = 이력의 가장 마지막 행의 상태. 이력이 없으면 기본 상태 (R-14: 조회 시 최신 행을 고른다) */
 export const currentStatus = (history = []) => (history.length ? history[history.length - 1].status : DEFAULT_STATUS);

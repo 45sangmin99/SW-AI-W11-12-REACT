@@ -18,10 +18,13 @@
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -83,6 +86,24 @@ def verify(data_dir, rows):
     return stored == expected
 
 
+def invalidate_service_cache():
+    """적재가 끝났으니 VOC 서비스가 들고 있는 캐시를 비우라고 알린다 (Redis에 옛 문의 결과가 남지 않게).
+    서비스가 꺼져 있거나 토큰(MINIDB_TOKEN)이 없으면 건너뛴다: 서비스는 켤 때 새 세대 번호로 시작한다"""
+    token = os.environ.get("MINIDB_TOKEN")
+    url = os.environ.get("VOC_SERVICE_URL", "http://127.0.0.1:8001").rstrip("/") + "/api/v1/admin/invalidate"
+    if not token:
+        print("참고: MINIDB_TOKEN이 없어 VOC 서비스의 캐시는 비우지 않았습니다 (서비스가 켜져 있다면 다시 시작하세요)")
+        return
+    request = urllib.request.Request(url, data=b"", method="POST", headers={"X-Admin-Token": token})
+    try:
+        with urllib.request.urlopen(request, timeout=3):
+            print("VOC 서비스의 캐시를 비웠습니다")
+    except urllib.error.HTTPError as e:
+        print(f"참고: VOC 서비스가 캐시 비우기를 거절했습니다 (HTTP {e.code}). 토큰이 서비스와 같은지 확인하세요")
+    except OSError:
+        print("참고: VOC 서비스가 꺼져 있어 캐시 비우기는 건너뜁니다 (서비스는 켤 때 새 세대로 시작합니다)")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--data-dir", type=Path, default=HERE / "data", help="만들 DB 데이터 폴더 (기본: db/data)")
@@ -109,6 +130,7 @@ def main():
     if not verify(data_dir, rows):
         fail("DB에서 다시 읽은 내용이 원본과 다릅니다")
     print(f"완료: 문의 {len(rows)}건을 {data_dir} 에 넣고 원본과 일치함을 확인했습니다")
+    invalidate_service_cache()
 
 
 if __name__ == "__main__":

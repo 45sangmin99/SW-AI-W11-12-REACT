@@ -473,10 +473,12 @@ describe("진행 상태 (F-08, R-14) — Step 1 임시 버전", () => {
     await withStatusApp((ctx) => {
       const { $, $$ } = ctx;
       const total = $$(".alert-card").length;
-      const summary = text($(".summary"));
       click(stepBtn(ctx, "분석 중")); // 첫 카드 → 분석 중
       click($$(".alert-card")[1]);
       click(stepBtn(ctx, "해결")); // 둘째 카드 → 해결
+      // 요약에는 "미해결 신호 N개"가 들어 있어 상태를 바꾸면 달라진다. 그래서 상태를 바꾼 뒤에 재서, 필터만의 영향을 본다
+      const summary = text($(".summary"));
+      assert(summary.includes(`미해결 신호 ${total - 1}개 (전체 ${total}개)`), "해결로 바꾼 신호 1개만큼 줄어든다");
 
       choose($("select[name=statusFilter]"), "분석 중");
       eq($$(".alert-card").length, 1);

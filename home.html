@@ -85,21 +85,22 @@ pre{margin-top:12px;background:var(--code);border:1px solid var(--line);border-r
       <ul>
         <li>필터와 이상 신호 카드, 근거 문의, 진행 현황</li>
         <li>가상 DOM을 만들고 <b>diff</b>로 비교해 <b>바뀐 곳만 patch</b></li>
-        <li>신호 탐지 계산은 브라우저(<code>analysis.js</code>)에서</li>
+        <li>신호 탐지·집계는 서버가 하고, 화면은 조건을 보내 결과만 받음 (샘플 모드는 브라우저에서 같은 코드로 계산)</li>
       </ul>
       <div class="tags"><span class="tag">가상 DOM</span><span class="tag">useState</span><span class="tag">Batching</span></div>
     </div>
 
     <div class="arrow">
       <span class="line">→</span>
-      <span class="step">조회 2개<br>상태 저장 1개<br>(<code>/api/*</code>)</span>
+      <span class="step">조건을 보내고<br>결과만 받음<br>(<code>/api/v1/*</code>)</span>
     </div>
 
     <div class="card">
-      <h3>중계기</h3>
-      <div class="sub">tools/dev-proxy.py</div>
+      <h3>VOC 서비스 (Node)</h3>
+      <div class="sub">tools/voc-service.mjs</div>
       <ul>
-        <li>열린 주소는 3개뿐. 브라우저는 SQL을 못 보냄</li>
+        <li><b>필터·탐지·집계·근거 페이지를 서버에서 계산</b> (<code>/api/v1</code>)</li>
+        <li>브라우저는 SQL을 못 보냄. 열린 주소는 정해진 API뿐</li>
         <li>DBMS 토큰은 여기에만 보관</li>
         <li><b>캐시 어사이드</b>: Redis를 먼저 보고, 없으면 DBMS</li>
         <li>같은 키의 동시 조회는 DBMS에 한 번만</li>
@@ -139,6 +140,7 @@ pre{margin-top:12px;background:var(--code);border:1px solid var(--line);border-r
     <tr><th>화면에서</th><th>Redis</th><th>DBMS</th></tr>
     <tr><td>페이지를 처음 열면</td><td>문의·이력 응답이 없으니 MISS. 읽은 결과를 압축해 저장(문의 60초, 이력 10초). 화면 배지: <b>DBMS 직접</b></td><td>SQL로 문의와 이력을 읽음</td></tr>
     <tr><td>다시 열거나 새로고침하면</td><td>있으면 HIT. 바로 응답. 화면 배지: <b>Redis 캐시</b></td><td>호출되지 않음</td></tr>
+    <tr><td>새 문의가 접수되면</td><td>고객 쪽(시연에서는 <code>simulate-intake.py</code>)이 DBMS에 저장한 뒤 캐시를 비움. 화면은 10초마다 다시 요청하므로 바뀐 순간에만 MISS</td><td>새 문의를 저장하고, 다음 조회에서 다시 읽어 건수와 신호를 새로 계산. 화면에는 문의 폼이 없음</td></tr>
     <tr><td>신호의 진행 상태를 바꾸면</td><td>DBMS 저장이 확인된 뒤에 이력 캐시를 삭제</td><td>INSERT, 영구 저장(<code>DURABLE</code>)을 확인해야 화면에 반영</td></tr>
     <tr><td>Redis를 끄면</td><td>없음</td><td>그대로 읽음. 화면은 똑같이 동작</td></tr>
     <tr><td>DBMS를 끄면</td><td>캐시 TTL이 남은 동안은 캐시로 응답할 수 있음</td><td>화면에 원인이 표시됨. <code>?source=sample</code>로 DB 없이 볼 수 있음</td></tr>
@@ -152,21 +154,22 @@ pre{margin-top:12px;background:var(--code);border:1px solid var(--line);border-r
     <a class="link" href="test.html"><strong>테스트</strong><span>미니 리액트 단위·기능 테스트</span></a>
     <a class="link" href="flow.html"><strong>노드 뷰어</strong><span>Step 4 목표 구조 (작업 흐름)</span></a>
   </div>
-  <pre>./tools/start-all.sh    # DBMS 서버 + Redis + 중계기를 한 번에 켭니다. Ctrl-C로 모두 끕니다
+  <pre>./tools/start-all.sh    # DBMS 서버 + Redis + VOC 서비스를 한 번에 켭니다. Ctrl-C로 모두 끕니다
+SIMULATE=1 ./tools/start-all.sh    # 위에 더해 고객 쪽 대역이 문의를 DB에 넣습니다 (화면이 10초마다 갱신)
 # 그다음 이 페이지 주소: http://localhost:8001/home.html</pre>
-  <p class="note">위 링크는 중계기(<code>:8001</code>)로 열었을 때 동작합니다. DB 없이 화면만 보려면 <code>python3 -m http.server 8000</code> 후 <code>/voc.html?source=sample</code>을 여세요.</p>
+  <p class="note">위 링크는 VOC 서비스(<code>:8001</code>)로 열었을 때 동작합니다. DB 없이 화면만 보려면 <code>python3 -m http.server 8000</code> 후 <code>/voc.html?source=sample</code>을 여세요.</p>
 </main>
 
 <script>
-// 중계기를 통해 DBMS까지 닿는지 확인한다 (Redis는 브라우저에서 직접 볼 수 없다)
+// VOC 서비스를 통해 DBMS까지 닿는지 확인한다 (Redis는 브라우저에서 직접 볼 수 없다)
 (async () => {
   const dot = document.getElementById("dot"), state = document.getElementById("state");
   try {
-    const r = await fetch("api/status-history");
+    const r = await fetch("api/v1/overview");
     if (!r.ok) throw new Error(r.status);
-    dot.className = "dot ok"; state.textContent = "중계기와 DBMS에 연결됨 (Redis 사용 여부는 중계기 시작 로그에서 확인)";
+    dot.className = "dot ok"; state.textContent = "VOC 서비스와 DBMS에 연결됨 (Redis 사용 여부는 서비스 시작 로그와 화면 배지로 확인)";
   } catch {
-    dot.className = "dot bad"; state.textContent = "중계기/DBMS에 연결되지 않음 (./tools/start-all.sh 로 켜세요). 샘플 모드는 그대로 열 수 있습니다";
+    dot.className = "dot bad"; state.textContent = "VOC 서비스/DBMS에 연결되지 않음 (./tools/start-all.sh 로 켜세요). 샘플 모드는 그대로 열 수 있습니다";
   }
 })();
 </script>
