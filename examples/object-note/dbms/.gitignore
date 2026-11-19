@@ -1,0 +1,9 @@
+build/
+.DS_Store
+.mini-db
+.mini-db.tmp-*
+examples/demo-db/tables/
+
+# Generated Python caches for test/benchmark scripts.
+__pycache__/
+*.pyc

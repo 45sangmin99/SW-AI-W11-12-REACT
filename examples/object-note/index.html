@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mini React - Phase 1 검증</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <button id="patch-btn" type="button">Patch</button>
+      <button id="back-btn" type="button">뒤로가기</button>
+      <button id="forward-btn" type="button">앞으로가기</button>
+    </header>
+
+    <main class="areas">
+      <section class="area">
+        <h2>실제 영역</h2>
+        <div id="real-root" class="content">
+          <h1 class="title">Mini React</h1>
+          <p>Virtual DOM을 <strong>Diff</strong>하고 <em>Patch</em>합니다.</p>
+          <ul>
+            <li>첫 번째 항목</li>
+            <li>두 번째 항목</li>
+            <li>세 번째 항목</li>
+          </ul>
+          <a href="https://example.com">링크</a>
+          <input type="text" value="입력창" />
+        </div>
+      </section>
+
+      <section class="area">
+        <h2>테스트 영역</h2>
+        <textarea id="test-code" spellcheck="false" aria-label="테스트 영역 HTML 코드"></textarea>
+        <div id="test-root" class="content"></div>
+      </section>
+    </main>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

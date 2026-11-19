@@ -20,6 +20,15 @@ export function setProp(node, name, value, previous) {
   } else {
     node.setAttribute(name, value === true ? '' : value);
   }
+
+  // Edited form controls keep a live value separate from their HTML attribute.
+  if (name === 'value' && (node.localName === 'input' || node.localName === 'textarea')) {
+    const nextValue = value == null || typeof value === 'boolean' ? '' : String(value);
+    // Browsers only allow clearing a file input, never assigning its filename.
+    if ((node.type !== 'file' || nextValue === '') && node.value !== nextValue) {
+      node.value = nextValue;
+    }
+  }
 }
 
 // Release handlers even when callers retain a removed node reference.

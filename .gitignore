@@ -1,2 +1,9 @@
 node_modules/
 __pycache__/
+
+# Local demo data and executable build outputs.
+/examples/object-note/db/data/
+/examples/object-note/dbms/build/
+/examples/object-note/dbms/reliable/build/
+/examples/object-note/redis/build/
+/examples/object-note/redis/data/

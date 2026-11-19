@@ -1,0 +1,6 @@
+id INT AUTO
+created_at VARCHAR(24)
+category VARCHAR(40)
+device VARCHAR(20)
+app_version VARCHAR(20)
+text VARCHAR(255)

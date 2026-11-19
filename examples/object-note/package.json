@@ -1,0 +1,7 @@
+{
+  "name": "mini-react-voc",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "description": "OBJECT NOTE VOC 이상 탐지. tools/voc-service.mjs(Node 서비스)가 src/voc/*.js 의 탐지 코드를 그대로 쓰기 위해 ES 모듈로 표시한다 (외부 패키지는 없다)"
+}

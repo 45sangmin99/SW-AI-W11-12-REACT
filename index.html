@@ -21,6 +21,7 @@
       .preview-toolbar label { display: flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
       textarea { flex: 1; width: 100%; min-height: 0; padding: 16px; border: 0; resize: none; font: 14px/1.6 monospace; tab-size: 2; }
       textarea:focus-visible { outline: 2px solid #555; outline-offset: -2px; }
+      .project-links { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 16px; font-size: 13px; }
       iframe { flex: 1; width: 100%; border: 0; }
       @media (max-width: 700px) {
         #app { grid-template-columns: 1fr; height: auto; }
@@ -40,6 +41,11 @@
           <button id="history-forward" type="button" disabled title="Ctrl/⌘+Shift+Z (코드 편집창 밖)">앞으로가기</button>
           <span id="history-position" role="status" aria-label="VDOM 이력">0 / 0</span>
         </div>
+        <nav class="project-links" aria-label="통합 예제">
+          <a href="./examples/labs-logistics/">Mini React 실습</a>
+          <a href="./examples/labs-logistics/logistics.html">물류 시뮬레이터</a>
+          <a href="./examples/object-note/voc.html?source=sample">VOC 이상 탐지</a>
+        </nav>
         <textarea id="editor" aria-labelledby="code-title" spellcheck="false"></textarea>
       </section>
       <section class="preview" aria-labelledby="preview-title">

@@ -1,7 +1,12 @@
 """Read-only route checks use temporary fixtures, never real engine assets."""
 import importlib.util
+from functools import partial
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 import tempfile
+import threading
+import urllib.error
+import urllib.request
 import unittest
 
 module_path = Path(__file__).resolve().parents[1] / 'dev_server.py'
@@ -50,6 +55,34 @@ class EngineRouteTest(unittest.TestCase):
             self.assertEqual(server.mini_project_file('/mini-project/', root), (root / 'index.html').resolve())
             for name in ['../secret.js', '%2e%2e/secret.js', '.env', 'package.json']:
                 self.assertIsNone(server.mini_project_file('/mini-project/' + name, root), name)
+
+
+class IntegratedDemosTest(unittest.TestCase):
+    def test_home_links_load_demos_and_public_assets(self):
+        handler = partial(server.DevHandler, directory=str(server.ROOT))
+        with ThreadingHTTPServer(('127.0.0.1', 0), handler) as http:
+            thread = threading.Thread(target=http.serve_forever)
+            thread.start()
+            base = f'http://127.0.0.1:{http.server_port}'
+            pages = {
+                '/': '통합 예제',
+                '/examples/labs-logistics/': 'Virtual DOM 변경 실험',
+                '/examples/labs-logistics/logistics.html': '물류 시뮬레이터',
+                '/examples/labs-logistics/src/logistics/logistics.js': 'FunctionComponent',
+                '/examples/object-note/voc.html?source=sample': 'OBJECT NOTE',
+                '/examples/object-note/data/inquiries.sample.json': 'inquiries',
+            }
+            try:
+                for path, marker in pages.items():
+                    with urllib.request.urlopen(base + path, timeout=3) as response:
+                        self.assertIn(marker, response.read().decode(), path)
+                for path in ('db/', 'dbms/Makefile', 'redis/Makefile', 'tools/voc-service.mjs'):
+                    with self.assertRaises(urllib.error.HTTPError) as error:
+                        urllib.request.urlopen(base + '/examples/object-note/' + path, timeout=3)
+                    self.assertEqual(error.exception.code, 404, path)
+            finally:
+                http.shutdown()
+                thread.join()
 
 
 if __name__ == '__main__':

@@ -1,0 +1,4 @@
+id INT AUTO
+alert_id VARCHAR(120)
+status VARCHAR(40)
+at VARCHAR(24)

@@ -1,0 +1,66 @@
+MDB_CLI="/Users/sangmin/Desktop/krafton-jungle/Week 11/SW-AI-W11-12-DBMS/reliable/build/mini-db" python3 tests/crash.py
+{
+  "crash_tests": [
+    {
+      "fault": "wal_partial",
+      "external_sigkill": true,
+      "counts_after_recovery": [
+        1,
+        1
+      ],
+      "repeat_identical": true
+    },
+    {
+      "fault": "before_commit_sync",
+      "external_sigkill": true,
+      "counts_after_recovery": [
+        2,
+        2
+      ],
+      "repeat_identical": true
+    },
+    {
+      "fault": "after_commit_sync",
+      "external_sigkill": true,
+      "counts_after_recovery": [
+        2,
+        2
+      ],
+      "repeat_identical": true
+    },
+    {
+      "fault": "after_csv_rename",
+      "external_sigkill": true,
+      "counts_after_recovery": [
+        2,
+        2
+      ],
+      "repeat_identical": true
+    },
+    {
+      "fault": "before_applied",
+      "external_sigkill": true,
+      "counts_after_recovery": [
+        2,
+        2
+      ],
+      "repeat_identical": true
+    },
+    {
+      "fault": "recovery_write",
+      "external_sigkill": true,
+      "repeat_identical": true
+    },
+    {
+      "fault": "id_reserved",
+      "external_sigkill": true,
+      "reserved_ids_not_reused": true
+    },
+    {
+      "fault": "init_baseline",
+      "external_sigkill": true,
+      "incomplete_initialization_rejected": true
+    }
+  ]
+}
+PASS crash: real child SIGKILL, multi-table atomic recovery, acknowledged commit preservation and repeated recovery
